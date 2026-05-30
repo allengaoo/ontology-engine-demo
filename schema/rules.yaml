@@ -1,0 +1,51 @@
+# 全局业务规则定义
+# 这些规则是"业务的宪法"，对所有操作生效
+# 规则在操作执行后（内存中）校验，违反则回滚
+
+rules:
+  - rule_id: certification_validity
+    description: 供应商认证有效期检查
+    trigger_on:
+      - create_purchase_order
+    
+    # 规则表达式（简化版，实际应使用更安全的DSL）
+    # 这里检查：供应商的认证证书剩余天数必须 >= 30 天
+    expression: |
+      cert_days_remaining >= 30
+    
+    violation_message: 供应商认证有效期不足 30 天，订单已阻断，需路由至人工审批
+    
+    # 规则涉及的对象（用于从ObjectStore加载快照）
+    requires_objects:
+      - type: Certification
+        filter: supplier_pk == {supplier_pk}
+
+  - rule_id: credit_limit_check
+    description: 供应商信用额度检查
+    trigger_on:
+      - create_purchase_order
+    
+    # 检查：新操作后的未结金额不超过信用额度
+    expression: |
+      outstanding_amount <= credit_limit
+    
+    violation_message: 采购金额超过供应商信用额度，订单已阻断
+    
+    requires_objects:
+      - type: Supplier
+        filter: pk == {supplier_pk}
+
+  - rule_id: order_amount_threshold
+    description: 大额订单需要额外审批
+    trigger_on:
+      - create_purchase_order
+    
+    # 检查：单笔订单金额不超过50万（超过需要特殊审批流程）
+    expression: |
+      amount <= 500000
+    
+    violation_message: 单笔采购金额超过 50 万元，需财务总监审批
+    
+    requires_objects:
+      - type: PurchaseOrder
+        filter: pk == {order_pk}

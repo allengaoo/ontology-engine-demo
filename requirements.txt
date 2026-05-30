@@ -1,0 +1,9 @@
+# 这个项目不需要任何外部依赖
+# 仅使用 Python 标准库
+
+# Python 版本要求
+# python_requires>=3.8
+
+# 如果你需要开发工具，可以选择性安装：
+# pip install pytest  # 用于测试
+# pip install black   # 用于代码格式化

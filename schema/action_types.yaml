@@ -1,0 +1,81 @@
+# 本体操作类型定义
+# 这个文件定义了系统中可以执行的业务操作，每个操作的前置条件和执行效果
+
+action_types:
+  create_purchase_order:
+    description: 向指定供应商发起采购订单
+    parameters:
+      supplier_pk:
+        type: string
+        required: true
+        description: 供应商主键
+      material:
+        type: string
+        required: true
+        description: 采购物料名称
+      amount:
+        type: number
+        required: true
+        description: 采购金额（元）
+      quantity:
+        type: number
+        required: false
+        description: 采购数量（可选）
+    
+    # 前置条件：执行前检查（"入场券"）
+    preconditions:
+      - condition: supplier.status == 'active'
+        message: 供应商状态必须为 active
+      - condition: supplier.contract_status == 'valid'
+        message: 供应商合同状态必须为 valid
+    
+    # 触发的全局规则（执行后检查，"出场检查"）
+    triggered_rules:
+      - certification_validity
+      - credit_limit_check
+    
+    # 执行效果
+    effects:
+      - create_object:
+          type: PurchaseOrder
+          properties:
+            supplier_pk: "{supplier_pk}"
+            material: "{material}"
+            amount: "{amount}"
+            quantity: "{quantity}"
+            status: draft
+            created_by: "{caller}"
+      - update_object:
+          type: Supplier
+          pk: "{supplier_pk}"
+          properties:
+            outstanding_amount: "{supplier.outstanding_amount + amount}"
+
+  approve_purchase_order:
+    description: 审批采购订单
+    parameters:
+      order_pk:
+        type: string
+        required: true
+        description: 订单主键
+      decision:
+        type: string
+        required: true
+        description: 审批决定 (approved/rejected)
+      comment:
+        type: string
+        required: false
+        description: 审批意见
+    
+    preconditions:
+      - condition: order.status == 'pending_approval'
+        message: 订单必须处于待审批状态
+    
+    triggered_rules: []
+    
+    effects:
+      - update_object:
+          type: PurchaseOrder
+          pk: "{order_pk}"
+          properties:
+            status: "{decision}"

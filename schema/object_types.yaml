@@ -1,0 +1,78 @@
+# 本体对象类型定义
+# 这个文件定义了系统中有哪些业务对象，每个对象有哪些属性
+
+object_types:
+  Supplier:
+    description: 供应商
+    properties:
+      pk:
+        type: string
+        description: 供应商主键
+      name:
+        type: string
+        description: 供应商名称
+      status:
+        type: string
+        description: 供应商状态 (active/suspended/terminated)
+      credit_limit:
+        type: number
+        description: 信用额度（元）
+      outstanding_amount:
+        type: number
+        description: 未结采购金额（元）
+      contract_status:
+        type: string
+        description: 合同状态 (valid/expired/suspended)
+      contract_expiry:
+        type: string
+        description: 合同到期日期（YYYY-MM-DD）
+
+  Certification:
+    description: 认证证书
+    properties:
+      pk:
+        type: string
+        description: 证书主键
+      supplier_pk:
+        type: string
+        description: 关联的供应商主键
+      cert_type:
+        type: string
+        description: 认证类型 (ISO-9001/ISO-14001等)
+      issue_date:
+        type: string
+        description: 发证日期（YYYY-MM-DD）
+      expiry_date:
+        type: string
+        description: 过期日期（YYYY-MM-DD）
+      days_remaining:
+        type: integer
+        description: 剩余有效天数
+
+  PurchaseOrder:
+    description: 采购订单
+    properties:
+      pk:
+        type: string
+        description: 订单主键
+      supplier_pk:
+        type: string
+        description: 供应商主键
+      material:
+        type: string
+        description: 采购物料名称
+      amount:
+        type: number
+        description: 采购金额（元）
+      quantity:
+        type: number
+        description: 采购数量
+      status:
+        type: string
+        description: 订单状态 (draft/pending_approval/approved/rejected/completed)
+      created_by:
+        type: string
+        description: 创建人
+      created_at:
+        type: string
+        description: 创建时间

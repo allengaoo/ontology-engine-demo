@@ -1,0 +1,29 @@
+[
+  {
+    "pk": "S-ACME-001",
+    "name": "ACME 精密部件有限公司",
+    "status": "active",
+    "credit_limit": 500000,
+    "outstanding_amount": 460000,
+    "contract_status": "valid",
+    "contract_expiry": "2026-12-31"
+  },
+  {
+    "pk": "S-BETA-002",
+    "name": "Beta 工业材料供应商",
+    "status": "active",
+    "credit_limit": 300000,
+    "outstanding_amount": 120000,
+    "contract_status": "valid",
+    "contract_expiry": "2027-03-15"
+  },
+  {
+    "pk": "S-GAMMA-003",
+    "name": "Gamma 化工原料",
+    "status": "active",
+    "credit_limit": 300000,
+    "outstanding_amount": 280000,
+    "contract_status": "valid",
+    "contract_expiry": "2027-06-30"
+  }
+]
