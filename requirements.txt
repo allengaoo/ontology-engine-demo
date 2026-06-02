@@ -2,8 +2,8 @@
 # python_requires>=3.8
 
 # 第二阶段（可选）：真实 LLM 路径
-# pip install openai
-# 设置环境变量 OPENAI_API_KEY 后，Agent 自动走真实 LLM；未设置则 fallback 到 mock
+# pip install openai          # OpenAI SDK（兼容 OpenAI / DeepSeek / 其他兼容接口）
+# pip install python-dotenv   # 自动加载 .env 文件（未安装时代码会内置简单解析）
 
 # 开发工具（可选）
 # pip install pytest
