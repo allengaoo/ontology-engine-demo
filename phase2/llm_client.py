@@ -76,7 +76,7 @@ class LLMClient:
     @property
     def mode_label(self) -> str:
         if self._mode == "llm":
-            model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+            model = os.environ.get("LLM_MODEL", "qwen3.7-plus")
             base_url = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
             return f"llm ({model} @ {base_url})"
         return "mock (离线兜底)"
@@ -106,7 +106,7 @@ class LLMClient:
 
         api_key = os.environ["LLM_API_KEY"]
         base_url = os.environ.get("LLM_BASE_URL") or None
-        model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+        model = os.environ.get("LLM_MODEL", "qwen3.7-plus")
 
         client = OpenAI(api_key=api_key, base_url=base_url)
         openai_tools = [
@@ -130,7 +130,7 @@ class LLMClient:
             model=model,
             messages=messages,
             tools=openai_tools,
-            tool_choice="required",
+            tool_choice="auto",
         )
 
         message = response.choices[0].message
