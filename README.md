@@ -1,25 +1,99 @@
 # 最小本体引擎 Demo
 
-这是一个完整可运行的最小本体引擎实现，便于更好的理解公众号文章的内容。
+这是一个完整可运行的最小本体引擎实现，便于更好地理解公众号文章《工程师的本体论》系列的内容。
+
+项目按阶段组织：**phase1** 为本体引擎核心（文章 5-7），**phase2** 为 Agent 交互层（文章 8-11）。
 
 ---
 
-## 🏗️ 架构设计
+## 📁 目录结构
+
+```
+ontology-engine-demo/
+├── README.md
+├── requirements.txt
+│
+├── phase1/                      # 第一阶段：本体引擎（文章 5-7）
+│   ├── schema/                  # YAML Schema 定义
+│   ├── data/                    # 测试数据（JSON）
+│   ├── logs/                    # 审计日志（运行后生成，已 gitignore）
+│   ├── engine/                  # 五个核心组件
+│   └── test_scenarios.py        # 三场景测试脚本
+│
+└── phase2/                      # 第二阶段：OAG / Agent 交互（文章 8-11）
+    ├── capability_provider.py   # Schema → Function Calling 能力清单
+    ├── llm_client.py            # 双路径 LLM / mock
+    ├── mock_agent.py            # 离线 mock Agent
+    ├── agent_gateway.py         # 发现→调用→拒绝→重试
+    ├── audit_query.py           # 决策血统审计查询
+    └── run_phase2_demo.py       # 演示入口
+```
+
+---
+
+## 🚀 快速开始
+
+### 前置要求
+
+- Python 3.8+
+- **phase1**：无外部依赖（仅 Python 标准库）
+- **phase2**：可选 `openai`（真实 LLM 路径）；未安装则自动 fallback 到 mock
+
+### 第一阶段：运行本体引擎
+
+```bash
+git clone https://github.com/allengaoo/ontology-engine-demo
+cd ontology-engine-demo
+
+python3 phase1/test_scenarios.py
+```
+
+预期输出三个场景：正常采购、认证过期拦截、多规则同时违反。
+
+### 第二阶段：运行 Agent 交互演示
+
+```bash
+# 完整演示（能力清单 → Agent 任务 → 审计查询）
+python3 phase2/run_phase2_demo.py
+
+# 仅打印能力清单
+python3 phase2/run_phase2_demo.py --manifest
+
+# 仅运行审计查询
+python3 phase2/run_phase2_demo.py --audit
+```
+
+**Agent 双路径**：
+
+| 路径 | 条件 | 说明 |
+|------|------|------|
+| 真实 LLM | 设置 `OPENAI_API_KEY` 且安装 `openai` | Function Calling 选操作 |
+| Mock 兜底 | 无 key 或调用失败 | 离线可跑，输出同构 |
+
+```bash
+export OPENAI_API_KEY=sk-...
+pip install openai   # 可选
+python3 phase2/run_phase2_demo.py
+```
+
+> API key 请通过环境变量或本地 `.env` 配置，**不要提交到仓库**（已在 `.gitignore` 中排除）。
+
+---
+
+## 🏗️ 架构设计（phase1）
 
 ### 核心设计原则
 
-本引擎基于Palantir本体架构的核心思想，做了三个关键简化：
+本引擎基于 Palantir 本体架构的核心思想，做了三个关键简化：
 
-
-| Palantir组件  | 解决的问题     | Demo实现               |
+| Palantir组件 | 解决的问题 | Demo实现 |
 | ----------- | --------- | -------------------- |
-| 对象数据库 + OSS | 海量数据查询和索引 | JSON文件 + 内存加载        |
-| 对象数据漏斗      | 实时数据同步    | 手动初始化数据              |
-| 分布式事务       | 并发写入一致性   | 内存事务 + 单线程           |
-| OMS         | 元数据管理     | **YAML文件（保留）**       |
-| 操作服务        | 规则校验 + 写回 | **ActionEngine（保留）** |
-| 审计日志        | 决策追溯      | **JSONL文件（保留）**      |
-
+| 对象数据库 + OSS | 海量数据查询和索引 | JSON文件 + 内存加载 |
+| 对象数据漏斗 | 实时数据同步 | 手动初始化数据 |
+| 分布式事务 | 并发写入一致性 | 内存事务 + 单线程 |
+| OMS | 元数据管理 | **YAML文件（保留）** |
+| 操作服务 | 规则校验 + 写回 | **ActionEngine（保留）** |
+| 审计日志 | 决策追溯 | **JSONL文件（保留）** |
 
 ### 五个核心组件
 
@@ -40,209 +114,38 @@
     └──────────────────┘         └────────────────┘
 ```
 
-**组件职责**：
-
 | 组件 | 职责 | 文件 |
 |------|------|------|
-| **ActionEngine** | 唯一写入入口，协调整个执行流程：校验前置条件、应用变更、评估规则、原子提交/回滚 | `action_engine.py` |
-| **SchemaLoader** | 加载和解析YAML Schema定义（对象类型、操作类型、规则） | `schema_loader.py` |
-| **ObjectStore** | 管理对象数据的读写和内存缓存，支持快照和回滚 | `object_store.py` |
-| **RuleEngine** | 评估全局业务规则，支持单条或收集所有违规 | `rule_engine.py` |
-| **AuditLogger** | 记录每次决策的完整上下文快照到JSONL文件 | `audit_logger.py` |
+| **ActionEngine** | 唯一写入入口，协调执行流程 | `engine/action_engine.py` |
+| **SchemaLoader** | 加载 YAML Schema | `engine/schema_loader.py` |
+| **ObjectStore** | 对象读写与内存缓存 | `engine/object_store.py` |
+| **RuleEngine** | 全局规则评估 | `engine/rule_engine.py` |
+| **AuditLogger** | 决策快照日志 | `engine/audit_logger.py` |
 
 ---
 
-## 🚀 快速开始
-
-### 前置要求
-
-- Python 3.8+
-- 无需安装任何第三方依赖（仅使用Python标准库）
-
-### 运行Demo
-
-```bash
-# 克隆仓库
-git clone https://github.com/allengaoo/ontology-engine-demo
-cd ontology-engine-demo
-
-# 直接运行测试场景
-python3 test_scenarios.py
-```
-
-### 预期输出
-
-```
-============================================================
-  场景1：Happy Path - 正常采购
-============================================================
-
-供应商：ACME 精密部件
-认证状态：有效期剩余 365 天
-✅ 操作 create_purchase_order 执行成功
-事件ID: evt-20260530-ec9023
-
-============================================================
-  场景2：拦截场景 - 认证即将过期
-============================================================
-
-供应商：Beta 工业材料
-认证状态：有效期剩余 13 天（< 30天阈值）
-❌ 操作被拦截！
-原因: 供应商认证有效期不足 30 天
-
-============================================================
-  场景3：边界条件 - 同时违反多条规则
-============================================================
-
-供应商：Gamma 化工原料
-❌ 操作被拦截！
-违反的规则（共 2 条）:
-   - certification_validity: 认证有效期不足 30 天
-   - credit_limit_check: 采购金额超过供应商信用额度
-
-💡 关键发现：引擎一次性返回了所有违规
-```
-
----
-
-## 📁 目录结构
-
-```
-ontology-engine-demo/
-├── README.md                    # 本文件
-├── requirements.txt             # Python依赖（空文件，无外部依赖）
-│
-├── schema/                      # Schema定义（YAML格式）
-│   ├── object_types.yaml        # 对象类型：Supplier, Certification, PurchaseOrder
-│   ├── action_types.yaml        # 操作类型：create_purchase_order
-│   └── rules.yaml               # 全局规则：certification_validity, credit_limit_check
-│
-├── data/                        # 测试数据（JSON格式）
-│   ├── Supplier.json            # 3个供应商
-│   ├── Certification.json       # 3张认证证书
-│   └── PurchaseOrder.json       # 订单（初始为空）
-│
-├── logs/                        # 审计日志（运行后生成）
-│   └── decisions.jsonl          # 每行一个决策事件
-│
-├── engine/                      # 核心引擎代码
-│   ├── __init__.py
-│   ├── schema_loader.py         # Schema加载器
-│   ├── object_store.py          # 对象存储
-│   ├── rule_engine.py           # 规则引擎
-│   ├── action_engine.py         # 操作引擎（核心）
-│   └── audit_logger.py          # 审计日志
-│
-└── test_scenarios.py            # 测试脚本：运行3个场景
-```
-
----
-
-## 🔑 三个关键设计决策
+## 🔑 三个关键设计决策（phase1）
 
 ### 决策1：规则在写入"后"执行
 
-**问题**：规则应该在写入前还是写入后检查？
-
-**答案**：写入后（在内存中）。
-
-**原因**：全局规则（不变式）需要检查"执行后的新状态"是否合法，而不是"当前状态能否执行"。
-
-```python
-# 4. 在内存中应用变更（文件未动）
-new_state = action_def.apply_effects(snapshot, params)
-
-# 5. 校验全局规则（写入后，但仍在内存）
-for rule in rule_engine.get_triggered_rules(action_id):
-    if not rule.evaluate(new_state):
-        # 违反规则 → 回滚（丢弃内存，文件从未被写）
-        return ActionResult.rejected(rule.violation_message)
-
-# 6. 全部通过，提交（唯一一次写文件）
-object_store.persist_all()
-```
-
----
+全局规则检查**执行后的新状态**；前置条件是"入场券"，全局规则是"出场检查"。
 
 ### 决策2：审计日志存"快照"而不是"变更"
 
-**问题**：日志应该记录"改了什么"（diff）还是"当时状态是什么"（snapshot）？
+`decisions.jsonl` 记录决策时的完整对象快照，便于三个月后还原"AI 为什么这样决定"。
 
-**答案**：快照。
+### 决策3：Schema 用 YAML 而不是 Python 类
 
-**原因**：三个月后需要回答"AI为什么这样决定"，diff无法还原决策上下文。
-
-```python
-@dataclass
-class DecisionEvent:
-    event_id: str
-    action_id: str
-    caller: str
-    params: dict
-    snapshot: dict           # ← 关键：完整对象状态
-    passed_rules: list[str]
-    outcome: str
-    executed_at: datetime
-```
-
----
-
-### 决策3：Schema用YAML而不是Python类
-
-**问题**：规则定义应该用YAML还是Python代码？
-
-**答案**：YAML。
-
-**原因**：业务人员需要审查规则，他们可能看不懂Python代码。
-
-```yaml
-# rules.yaml - 业务人员可以直接打开审查
-- rule_id: certification_validity
-  trigger_on: create_purchase_order
-  expression: "cert_days_remaining >= 30"
-  violation_message: 供应商认证有效期不足 30 天
-```
+`phase1/schema/` 下的 YAML 同时服务业务审查（人读）与引擎执行（机器读）；phase2 进一步将其转为 Agent 能力清单。
 
 ---
 
 ## 🛠️ 自定义场景
 
-### 修改测试数据
+修改 `phase1/data/Supplier.json` 或 `phase1/schema/rules.yaml` 后，重新运行：
 
-编辑 `data/Supplier.json`，例如添加一个新供应商：
-
-```json
-{
-  "pk": "S-DELTA-004",
-  "name": "Delta 电子元件",
-  "status": "active",
-  "credit_limit": 800000,
-  "outstanding_amount": 0,
-  "contract_status": "valid",
-  "contract_expiry": "2027-12-31"
-}
-```
-
-### 修改规则
-
-编辑 `schema/rules.yaml`，例如修改认证有效期阈值：
-
-```yaml
-- rule_id: certification_validity
-  expression: "cert_days_remaining >= 60"  # 从30改成60
-  violation_message: 供应商认证有效期不足 60 天
-```
-
-### 添加新规则
-
-在 `schema/rules.yaml` 添加：
-
-```yaml
-- rule_id: order_amount_threshold
-  trigger_on: create_purchase_order
-  expression: "amount <= 500000"
-  violation_message: 单笔采购金额超过 50 万元，需财务总监审批
+```bash
+python3 phase1/test_scenarios.py
 ```
 
 ---
@@ -256,11 +159,10 @@ MIT License
 ## 💬 联系方式
 
 - **公众号**：工程师的本体论
-- **问题反馈**：提交GitHub Issue
-- **商业咨询**：公众号后台留言
+- **问题反馈**：提交 GitHub Issue
 
 ---
 
-**最后更新**：2026-05-30
+**最后更新**：2026-06-01
 
-如果这个Demo对你有帮助，欢迎Star ⭐
+如果这个 Demo 对你有帮助，欢迎 Star ⭐

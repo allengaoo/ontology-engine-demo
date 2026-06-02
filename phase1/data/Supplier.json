@@ -4,7 +4,7 @@
     "name": "ACME 精密部件有限公司",
     "status": "active",
     "credit_limit": 500000,
-    "outstanding_amount": 460000,
+    "outstanding_amount": 180000,
     "contract_status": "valid",
     "contract_expiry": "2026-12-31"
   },

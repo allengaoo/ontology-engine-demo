@@ -1,9 +1,11 @@
-# 这个项目不需要任何外部依赖
-# 仅使用 Python 标准库
-
-# Python 版本要求
+# 第一阶段：无外部依赖（Python 标准库即可）
 # python_requires>=3.8
 
-# 如果你需要开发工具，可以选择性安装：
-# pip install pytest  # 用于测试
-# pip install black   # 用于代码格式化
+# 第二阶段（可选）：真实 LLM 路径
+# pip install openai
+# 设置环境变量 OPENAI_API_KEY 后，Agent 自动走真实 LLM；未设置则 fallback 到 mock
+
+# 开发工具（可选）
+# pip install pytest
+# pip install black
+# pip install pyyaml  # 若系统 Python 未自带 yaml（多数环境已内置）

@@ -10,9 +10,9 @@
 import sys
 from pathlib import Path
 
-# 添加democode到Python路径
-democode_dir = Path(__file__).parent
-sys.path.insert(0, str(democode_dir))
+# 添加 phase1 到 Python 路径
+phase1_dir = Path(__file__).parent
+sys.path.insert(0, str(phase1_dir))
 
 from engine import (
     SchemaLoader,
@@ -29,9 +29,9 @@ def print_separator(title):
 
 def main():
     # 初始化引擎
-    schema_dir = democode_dir / "schema"
-    data_dir = democode_dir / "data"
-    log_dir = democode_dir / "logs"
+    schema_dir = phase1_dir / "schema"
+    data_dir = phase1_dir / "data"
+    log_dir = phase1_dir / "logs"
     
     schema_loader = SchemaLoader(schema_dir)
     object_store = ObjectStore(data_dir)

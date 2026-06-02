@@ -19,6 +19,16 @@ ENV/
 *~
 .DS_Store
 
+# 敏感信息（切勿提交）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+**/secrets/
+
 # 运行时生成的文件
 logs/
 *.log
