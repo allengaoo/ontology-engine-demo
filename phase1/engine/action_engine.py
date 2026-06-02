@@ -219,18 +219,22 @@ class ActionEngine:
     def _build_precondition_context(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """构建前置条件检查的上下文"""
         context = {}
-        
-        # 加载相关对象
+
         if 'supplier_pk' in params:
             supplier = self.object_store.get_object('Supplier', params['supplier_pk'])
             if supplier:
                 context['supplier'] = supplier
-        
+            else:
+                # 供应商不存在时注入哨兵，让 eval 能运行并返回 False
+                context['supplier'] = {'status': 'not_found', 'contract_status': 'not_found'}
+
         if 'order_pk' in params:
             order = self.object_store.get_object('PurchaseOrder', params['order_pk'])
             if order:
                 context['order'] = order
-        
+            else:
+                context['order'] = {'status': 'not_found'}
+
         context.update(params)
         return context
     

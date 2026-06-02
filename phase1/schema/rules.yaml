@@ -7,15 +7,16 @@ rules:
     description: 供应商认证有效期检查
     trigger_on:
       - create_purchase_order
-    
-    # 规则表达式（简化版，实际应使用更安全的DSL）
-    # 这里检查：供应商的认证证书剩余天数必须 >= 30 天
+
+    # 规则表达式：供应商的认证证书剩余天数必须 >= 30 天
     expression: |
       cert_days_remaining >= 30
-    
+
     violation_message: 供应商认证有效期不足 30 天，订单已阻断，需路由至人工审批
-    
-    # 规则涉及的对象（用于从ObjectStore加载快照）
+
+    # OAG：规则被违反时，本体层给 Agent 的结构化建议（而非硬编码在应用层）
+    suggestion: 该供应商认证即将过期，请更换认证有效期 >= 30 天的其他供应商，或等待认证续期后重试
+
     requires_objects:
       - type: Certification
         filter: supplier_pk == {supplier_pk}
@@ -24,13 +25,15 @@ rules:
     description: 供应商信用额度检查
     trigger_on:
       - create_purchase_order
-    
+
     # 检查：新操作后的未结金额不超过信用额度
     expression: |
       outstanding_amount <= credit_limit
-    
+
     violation_message: 采购金额超过供应商信用额度，订单已阻断
-    
+
+    suggestion: 当前供应商未结金额已接近信用额度，请减少本次采购金额，或选择未结金额更低的备选供应商
+
     requires_objects:
       - type: Supplier
         filter: pk == {supplier_pk}
@@ -39,13 +42,15 @@ rules:
     description: 大额订单需要额外审批
     trigger_on:
       - create_purchase_order
-    
-    # 检查：单笔订单金额不超过50万（超过需要特殊审批流程）
+
+    # 检查：单笔订单金额不超过50万
     expression: |
       amount <= 500000
-    
+
     violation_message: 单笔采购金额超过 50 万元，需财务总监审批
-    
+
+    suggestion: 单笔金额超过 50 万元需走特殊审批流程，请将订单拆分为多笔，或提前申请大额采购授权
+
     requires_objects:
       - type: PurchaseOrder
         filter: pk == {order_pk}

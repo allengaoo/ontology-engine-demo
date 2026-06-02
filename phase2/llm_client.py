@@ -77,7 +77,7 @@ class LLMClient:
     def mode_label(self) -> str:
         if self._mode == "llm":
             model = os.environ.get("LLM_MODEL", "qwen3.7-plus")
-            base_url = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
+            base_url = os.environ.get("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
             return f"llm ({model} @ {base_url})"
         return "mock (离线兜底)"
 

@@ -1,16 +1,17 @@
 """
 AuditQuery - 决策血统审计查询工具（第11篇配套）
 
-三个查询场景：
-1. 某供应商被 AI 选中的决策模式
-2. 某条规则的拦截统计
-3. 某个 Agent 的决策质量
+OAG Layer 3 - Decision Lineage 的查询接口：
+1. 按供应商查询决策模式（供应商被 AI 频繁选中，为什么？）
+2. 按规则查询拦截统计（某条业务规则上线后效果如何？）
+3. 按 Agent 查询决策质量（这个 Agent 有多可靠？）
+4. 还原完整任务决策链（这个任务，AI 经历了什么才做出最终决策？）
 """
 
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -134,6 +135,87 @@ class AuditQuery:
                 return e
         return None
 
+    def query_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Layer 3 - Decision Lineage 核心查询：还原一个任务的完整决策链
+
+        回答：这个任务，Agent 经历了几轮？每轮为什么被拦截？怎么调整的？
+        """
+        task_log_file = self.log_file.parent / "task_decisions.jsonl"
+        if not task_log_file.exists():
+            return None
+        with open(task_log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    if data.get("task_id") == task_id:
+                        return data
+                except json.JSONDecodeError:
+                    continue
+        return None
+
+    def list_tasks(self) -> List[Dict[str, Any]]:
+        """列出所有任务的摘要（task_id、task、最终结果、轮数）"""
+        task_log_file = self.log_file.parent / "task_decisions.jsonl"
+        if not task_log_file.exists():
+            return []
+        tasks = []
+        with open(task_log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    tasks.append({
+                        "task_id": data.get("task_id"),
+                        "task": data.get("task"),
+                        "agent_mode": data.get("agent_mode"),
+                        "final_outcome": data.get("final_outcome"),
+                        "total_rounds": data.get("total_rounds"),
+                        "executed_at": data.get("executed_at"),
+                    })
+                except json.JSONDecodeError:
+                    continue
+        return tasks
+
+    def explain_task(self, task_id: str) -> None:
+        """
+        打印一个任务的完整决策链——OAG 可追溯性的直观展示
+
+        展示："AI 看到了什么约束 → 为什么被拒绝 → 如何调整 → 最终结果"
+        """
+        task = self.query_task(task_id)
+        if not task:
+            print(f"未找到任务: {task_id}")
+            return
+
+        print(f"\n{'='*60}")
+        print(f"  任务决策链还原")
+        print(f"{'='*60}")
+        print(f"  任务 ID  : {task['task_id']}")
+        print(f"  任务描述 : {task['task']}")
+        print(f"  Agent 模式: {task['agent_mode']}")
+        print(f"  最终结果 : {task['final_outcome']}")
+        print(f"  总轮数   : {task['total_rounds']}")
+        print(f"  执行时间 : {task['executed_at']}")
+        print()
+
+        for rnd in task.get("rounds", []):
+            status_icon = "✅" if rnd["engine_status"] == "success" else "❌"
+            print(f"  第 {rnd['round']} 轮 [{rnd['agent_source']}] {status_icon}")
+            print(f"    操作  : {rnd['action_id']}({json.dumps(rnd['params'], ensure_ascii=False)})")
+            print(f"    理由  : {rnd['reasoning']}")
+            print(f"    引擎  : {rnd['engine_message']}")
+            if rnd.get("triggered_rule"):
+                print(f"    触发规则 : {rnd['triggered_rule']}")
+            if rnd.get("suggestion"):
+                print(f"    本体建议 : {rnd['suggestion']}")
+            print()
+
     def print_report(self) -> None:
         print("=" * 60)
         print("  审计查询报告")
@@ -153,3 +235,10 @@ class AuditQuery:
         quality = self.query_agent_quality("procurement-agent-v2")
         print(f"\n[Agent {quality['caller']}] 成功率 {quality['success_rate']:.0%}，"
               f"共 {quality['total_decisions']} 次决策")
+
+        # 展示任务决策链（Layer 3 核心）
+        tasks = self.list_tasks()
+        if tasks:
+            print(f"\n[OAG 任务决策链] 共 {len(tasks)} 条任务记录")
+            latest = tasks[-1]
+            self.explain_task(latest["task_id"])

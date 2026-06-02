@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
 """
-第二阶段演示脚本
+第二阶段演示脚本 —— OAG 完整链路
 
-演示 OAG 完整链路：
-1. 从 Schema 生成能力清单
-2. Agent（真实 LLM 或 mock）选择操作
-3. 本体引擎执行 / 拦截
-4. 被拦截后根据结构化拒绝响应重试
-5. 审计查询
+OAG（Ontology Augmented Generation）三层能力展示：
+
+  Layer 1 - Capability Discovery（能力发现）
+    本体 Schema → Function Calling 格式 → Agent 的"操作手册"
+    同一份 YAML，对人可读，对 Agent 可执行
+
+  Layer 2 - Execution Constraints（执行约束）
+    Agent 发起操作 → 引擎实时校验业务规则 → 违规则强制回滚
+    拒绝响应结构化：触发规则 + 当前状态快照 + Schema 驱动建议
+    Agent 收到建议 → 重新生成决策（OAG 的 "G"）
+
+  Layer 3 - Decision Lineage（决策血统）
+    任务级日志记录完整决策链（task_decisions.jsonl）
+    事后可还原："AI 看到了什么 → 为什么被拒 → 如何调整 → 最终结果"
 
 用法:
-  python3 phase2/run_phase2_demo.py
-  python3 phase2/run_phase2_demo.py --manifest   # 仅打印能力清单
-  python3 phase2/run_phase2_demo.py --audit      # 仅运行审计查询
+  python3 phase2/run_phase2_demo.py              # 完整演示
+  python3 phase2/run_phase2_demo.py --manifest   # 仅打印能力清单（Layer 1）
+  python3 phase2/run_phase2_demo.py --audit      # 仅运行审计查询（Layer 3）
 
-环境变量（可选）:
-  OPENAI_API_KEY  设置后走真实 LLM，否则自动 fallback 到 mock
-  OPENAI_MODEL    默认 gpt-4o-mini
+环境变量（democode/.env）:
+  LLM_API_KEY   设置后走真实 LLM，否则自动 fallback 到 mock
+  LLM_BASE_URL  自定义 API 地址（兼容 OpenAI / DeepSeek 等）
+  LLM_MODEL     模型名称（默认 gpt-4o-mini）
 """
 
 from __future__ import annotations
@@ -57,33 +66,28 @@ def print_separator(title: str) -> None:
 
 
 def run_manifest() -> None:
-    print_separator("能力清单（Schema → Function Calling）")
+    print_separator("Layer 1 - Capability Discovery：Schema → Agent 操作手册")
     provider = CapabilityProvider(PHASE1_DIR / "schema")
     provider.print_manifest()
 
 
 def run_agent_demo() -> None:
-    print_separator("Agent 任务：向供应商发起采购")
+    print_separator("Layer 2 - Execution Constraints + OAG Generation：Agent 任务执行")
     reset_demo_data()
     gateway = AgentGateway(PHASE1_DIR)
-    task = "为生产线补充工业胶水，向合适的供应商发起采购订单"
+    task = (
+        "为生产线补充工业胶水，向合适的供应商发起采购订单。"
+        "当前可用供应商：S-ACME-001（ACME，认证有效）、S-BETA-002（Beta，认证即将过期）、"
+        "S-GAMMA-003（Gamma，信用额度已接近上限）。"
+        "请选择合规的供应商，采购金额约 80000 元，数量 500 件。"
+    )
     gateway.execute_agent_task(task)
 
 
 def run_audit() -> None:
-    print_separator("审计查询")
+    print_separator("Layer 3 - Decision Lineage：审计查询与决策链还原")
     query = AuditQuery(PHASE1_DIR / "logs")
     query.print_report()
-
-    # 尝试解释一条成功决策（若存在）
-    events = query._load_events()
-    success_events = [e for e in events if e.get("outcome") == "success"]
-    if success_events:
-        evt = success_events[0]
-        print(f"\n示例：解释决策 {evt['event_id']}")
-        print(f"  操作: {evt['action_id']}")
-        print(f"  调用方: {evt['caller']}")
-        print(f"  通过规则: {', '.join(evt.get('passed_rules', []))}")
 
 
 def main() -> None:
