@@ -8,7 +8,7 @@ LLMClient - 双路径 LLM 调用（真实 / mock fallback）
 .env 支持的变量：
     LLM_API_KEY   必填，API 密钥
     LLM_BASE_URL  可选，自定义接口地址（默认 https://api.openai.com/v1）
-    LLM_MODEL     可选，模型名称（默认 gpt-4o-mini）
+    LLM_MODEL     可选，模型名称（默认 qwen3.7）
 """
 
 from __future__ import annotations
