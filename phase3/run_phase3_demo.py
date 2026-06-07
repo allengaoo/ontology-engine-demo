@@ -40,6 +40,10 @@ PHASE1_DIR = ROOT / "phase1"
 MEMORY_DIR = ROOT / "phase3" / "memory_db"
 sys.path.insert(0, str(ROOT))
 
+# 加载 .env 文件（支持 LLM API key 配置）
+from phase2.llm_client import _load_dotenv_once
+_load_dotenv_once()
+
 from phase3.memory_compressor import estimate_tokens, TokenBudget
 from phase3.memory_gateway import MemoryGateway
 from phase3.memory_store import MemoryStore, MemoryLayer
