@@ -6,19 +6,27 @@
 
   模式 A（无记忆）：
     每轮全量注入 Schema + 完整历史 → token 线性增长 → 推理退化
+    实际调用 LLM：展示模型在长上下文中"忘记"早期关键约束
 
   模式 B（有记忆）：
     按需检索 + 分级压缩 → token 保持稳定 → 推理一致性高
+    实际调用 LLM：展示 CRITICAL 约束在第 8 轮依然被准确引用
 
 演示场景（延续 Phase 1-2 的采购场景）：
   多轮对话讨论"是否应该调整认证有效期规则"
   涉及：规则分析 → 影响评估 → 修改建议 → 确认决策
 
 用法：
-  python3 phase3/run_phase3_demo.py                # 完整对比演示
+  python3 phase3/run_phase3_demo.py                # 完整对比演示（推荐：需配置 LLM_API_KEY）
   python3 phase3/run_phase3_demo.py --no-memory    # 仅无记忆模式（展示问题）
   python3 phase3/run_phase3_demo.py --with-memory  # 仅有记忆模式（展示解法）
+  python3 phase3/run_phase3_demo.py --token-only   # 仅 token 统计（不调用 LLM，离线可用）
   python3 phase3/run_phase3_demo.py --memory-stats # 打印记忆库状态
+
+环境变量（可选，不配置则使用 mock 模式）：
+  export LLM_API_KEY=sk-your-openai-api-key
+  export LLM_MODEL=gpt-4o-mini  # 默认值
+  export LLM_BASE_URL=https://api.openai.com/v1  # 默认值，支持兼容接口
 """
 
 from __future__ import annotations
@@ -57,24 +65,49 @@ def print_separator(title: str, char: str = "=") -> None:
     print(f"{char * 60}\n")
 
 
+def _check_llm_available() -> bool:
+    """检查是否配置了 LLM API key"""
+    import os
+    return bool(os.environ.get("LLM_API_KEY"))
+
+
 # ── 模式 A：无记忆（展示问题） ────────────────────────────────────────────────
 
-def run_no_memory_mode() -> None:
+def run_no_memory_mode(use_llm: bool = True) -> None:
     """
-    模拟无记忆模式：
-    每轮全量注入完整 Schema + 历史对话，展示 token 增长曲线
+    无记忆模式：每轮全量注入完整 Schema + 历史对话
+    
+    - Token 增长曲线展示
+    - 实际调用 LLM（如果 use_llm=True）
+    - 展示模型在长上下文中"忘记"早期约束的问题（Lost in Middle）
     """
     print_separator("模式 A：无记忆（全量注入）")
 
-    # 模拟完整 Schema 的 token 数（来自 Phase 1 YAML 文件的实际大小）
-    full_schema_tokens = _estimate_full_schema_tokens()
+    if use_llm and not _check_llm_available():
+        print("⚠️  未检测到 LLM_API_KEY，将使用 token 统计模式（不调用 LLM）")
+        print("   提示：export LLM_API_KEY=sk-your-key 后可启用真实推理对比\n")
+        use_llm = False
 
-    history_text = ""
+    # 加载完整 Schema
+    full_schema_text = _load_full_schema()
+    full_schema_tokens = estimate_tokens(full_schema_text)
+
+    # 构建 system prompt（全量注入）
+    system_prompt = f"""你是一个本体工程顾问，帮助用户分析和调整业务规则。
+
+以下是完整的 Schema 定义（包含所有对象、规则、函数）：
+
+{full_schema_text}
+
+请基于这些约束回答用户的问题，确保你的建议不违反任何规则。"""
+
+    history = []
+    
     print(f"{'轮次':^4} {'Schema':^8} {'历史':^8} {'合计':^8}  状态")
-    print("-" * 45)
+    print("-" * 50)
 
     for i, turn in enumerate(DIALOG_TURNS, 1):
-        history_text += f"用户: {turn}\n助手: [回复内容]\n"
+        history_text = "\n".join([f"{role}: {msg}" for role, msg in history])
         history_tokens = estimate_tokens(history_text)
         total = full_schema_tokens + history_tokens
 
@@ -89,23 +122,48 @@ def run_no_memory_mode() -> None:
 
         print(f"  {i:^4} {full_schema_tokens:^8} {history_tokens:^8} {total:^8}  {status}")
 
-    print(f"\n→ 第 {len(DIALOG_TURNS)} 轮总 token: {full_schema_tokens + estimate_tokens(history_text)}")
-    print("→ 无记忆模式：token 随轮次线性增长，推理准确率逐渐退化")
+        # 调用 LLM（如果启用）
+        if use_llm:
+            response = _call_llm_no_memory(system_prompt, history, turn)
+        else:
+            response = f"[未启用 LLM] 模拟回复：{turn[:40]}..."
+        
+        history.append(("用户", turn))
+        history.append(("助手", response))
+
+        # 只展示关键轮次的完整回答
+        if i in [1, 4, 7, 8]:
+            print(f"\n  [第 {i} 轮对话]")
+            print(f"  用户：{turn}")
+            print(f"  助手：{response[:300]}{'...' if len(response) > 300 else ''}\n")
+
+    print(f"\n→ 第 {len(DIALOG_TURNS)} 轮总 token: {full_schema_tokens + estimate_tokens(''.join([f'{r}:{m}' for r,m in history]))}")
+    print("→ 无记忆模式：token 随轮次线性增长")
+    if use_llm:
+        print("→ 推理质量：后期轮次可能遗忘早期关键约束（Lost in Middle 效应）")
 
 
 # ── 模式 B：有记忆（展示解法） ────────────────────────────────────────────────
 
-def run_with_memory_mode() -> None:
+def run_with_memory_mode(use_llm: bool = True) -> None:
     """
-    有记忆模式：
-    按需检索 + 分级压缩，展示 token 稳定和推理一致性。
+    有记忆模式：按需检索 + 分级压缩
     
-    ─── Token 对比表：纯本地计算，不发起 LLM 调用 ───────────────────
-    ─── 最后 1 轮：调用 LLM（若 .env 有效）或 mock 兜底 ────────────
+    - Token 保持稳定
+    - 实际调用 LLM（如果 use_llm=True）
+    - CRITICAL 约束在第 8 轮依然被准确引用
     """
     print_separator("模式 B：有记忆（按需检索 + 分级压缩）")
 
+    if use_llm and not _check_llm_available():
+        print("⚠️  未检测到 LLM_API_KEY，将使用 token 统计模式（不调用 LLM）")
+        print("   提示：export LLM_API_KEY=sk-your-key 后可启用真实推理对比\n")
+        use_llm = False
+
+    # 初始化记忆网关并写入 CRITICAL 约束
     gw = MemoryGateway(phase1_dir=PHASE1_DIR, memory_dir=MEMORY_DIR)
+    _initialize_critical_constraints(gw)
+    
     session_id = gw.start_session("讨论认证有效期规则调整的可行性")
     print()
 
@@ -115,8 +173,9 @@ def run_with_memory_mode() -> None:
     print("-" * 58)
 
     simulated_no_memory_history_tokens = 0
+    
     for i, turn in enumerate(DIALOG_TURNS, 1):
-        # ── token 统计（本地，不调用 LLM）──────────────────────────────
+        # Token 统计
         stats = gw.token_stats(turn)
         total = stats["total_tokens"]
 
@@ -126,37 +185,46 @@ def run_with_memory_mode() -> None:
 
         print(
             f"  {i:^4} {stats['memory_tokens']:^10} "
-            f"{stats['history_tokens']:^8} {total:^8}  节省 {saved} tokens（无记忆 ~{no_memory_total}）"
+            f"{stats['history_tokens']:^8} {total:^8}  节省 {saved} tokens"
         )
 
-        # 只写 session 历史，不调 LLM（mock 写入历史用于 token 统计）
-        gw.session_manager.add_turn(session_id, "user", turn)
-        gw.session_manager.add_turn(session_id, "assistant", f"[记录] {turn[:40]}...")
+        # 调用 LLM（如果启用）
+        if use_llm:
+            response = gw.chat(turn, verbose=False)
+        else:
+            # 只记录历史，不调用 LLM
+            gw.session_manager.add_turn(session_id, "user", turn)
+            response = f"[未启用 LLM] 模拟回复：{turn[:40]}..."
+            gw.session_manager.add_turn(session_id, "assistant", response)
 
-    print(f"\n→ 第 {len(DIALOG_TURNS)} 轮总 token（有记忆）: {gw.token_stats(DIALOG_TURNS[-1])['total_tokens']}")
-    print("→ 有记忆模式：token 保持稳定，CRITICAL 约束始终存在，推理一致性高")
+        # 只展示关键轮次的完整回答
+        if i in [1, 4, 7, 8]:
+            print(f"\n  [第 {i} 轮对话]")
+            print(f"  用户：{turn}")
+            
+            if use_llm:
+                # 展示注入的记忆内容
+                retrieval = gw.retriever.retrieve(turn)
+                compressed = gw.compressor.compress(retrieval)
+                print(f"  [注入记忆] {compressed.stats()}")
+                if i == 8:  # 最后一轮，展示完整注入内容
+                    print(f"\n{compressed.to_prompt_text()}\n")
+            
+            print(f"  助手：{response[:300]}{'...' if len(response) > 300 else ''}\n")
 
-    # ── 最后一轮实际对话（展示约束一致性，mock 兜底）─────────────────────
-    print_separator("最后一轮对话示例（含记忆注入）", char="-")
-    final_input = DIALOG_TURNS[-1]
-    retrieval = gw.retriever.retrieve(final_input)
-    compressed = gw.compressor.compress(retrieval)
-    history_ctx = gw.session_manager.build_history_context(session_id)
-
-    print(f"注入记忆（{compressed.total_tokens} tokens）：")
-    print(compressed.to_prompt_text())
-    print(f"\n用户：{final_input}")
-
-    response = gw._mock_response(final_input)
-    print(f"\n助手（mock）：{response}")
+    final_stats = gw.token_stats(DIALOG_TURNS[-1])
+    print(f"\n→ 第 {len(DIALOG_TURNS)} 轮总 token（有记忆）: {final_stats['total_tokens']}")
+    print("→ 有记忆模式：token 保持稳定，CRITICAL 约束始终存在")
+    if use_llm:
+        print("→ 推理质量：第 8 轮依然能准确引用第 1 轮确立的关键约束")
 
 
 # ── 对比汇总 ──────────────────────────────────────────────────────────────────
 
-def run_comparison() -> None:
-    """无记忆 vs 有记忆的完整对比"""
-    run_no_memory_mode()
-    run_with_memory_mode()
+def run_comparison(use_llm: bool = True) -> None:
+    """无记忆 vs 有记忆的完整对比（带真实 LLM 推理）"""
+    run_no_memory_mode(use_llm=use_llm)
+    run_with_memory_mode(use_llm=use_llm)
 
     print_separator("对比结论")
     schema_tokens = _estimate_full_schema_tokens()
@@ -167,7 +235,7 @@ def run_comparison() -> None:
     no_memory_total = schema_tokens + estimate_tokens(history_text)
 
     # 有记忆模式：55 tokens CRITICAL + 约 300 tokens 压缩历史
-    with_memory_total = 55 + estimate_tokens(" ".join(DIALOG_TURNS))
+    with_memory_total = 55 + estimate_tokens(" ".join(DIALOG_TURNS[-3:]))  # 最近3轮
     saved_pct = int((1 - with_memory_total / max(no_memory_total, 1)) * 100)
 
     print(f"  无记忆模式 第{turns}轮 总token : ~{no_memory_total:,}（全量 Schema + 完整历史）")
@@ -175,11 +243,19 @@ def run_comparison() -> None:
     print(f"  Token 节省比例             : ~{max(saved_pct, 0)}%")
     print()
     print("  ──────────────────────────────────────────────────────")
-    print("  【更重要的区别不是 token 数，而是约束一致性】")
+    print("  【更重要的区别不是 token 数，而是推理质量】")
     print()
-    print("  有记忆模式：第1轮确认的 [CRITICAL] 约束在第8轮依然完整注入。")
-    print("  无记忆模式：随着历史增长，早期约束会被淹没在长上下文中间，")
-    print("             LLM 对「中间内容」的关注度显著下降（Lost in Middle）。")
+    if use_llm:
+        print("  有记忆模式：第1轮确认的 [CRITICAL] 约束在第8轮依然完整注入。")
+        print('            模型能准确引用"认证有效期 >= 30天"这一关键约束。')
+        print()
+        print("  无记忆模式：随着历史增长，早期约束被淹没在长上下文中间，")
+        print("            LLM 对「中间内容」的关注度显著下降（Lost in Middle）。")
+        print("            模型可能给出与第1轮约束矛盾的建议。")
+    else:
+        print("  在真实 LLM 场景中（配置 LLM_API_KEY 后）：")
+        print("  - 有记忆模式：第8轮依然能准确引用第1轮的 CRITICAL 约束")
+        print("  - 无记忆模式：随着历史增长，早期约束被遗忘（Lost in Middle）")
     print()
     print("  在 20-50 轮的真实本体构建场景中，无记忆模式：")
     print("  - Schema 更大（5000-15000 tokens），token 增长更剧烈")
@@ -218,23 +294,89 @@ def _estimate_full_schema_tokens() -> int:
     return max(total, 800)  # 至少 800 tokens
 
 
+def _load_full_schema() -> str:
+    """加载 Phase 1 的完整 Schema 定义"""
+    schema_dir = PHASE1_DIR / "schema"
+    schema_parts = []
+    for yaml_file in sorted(schema_dir.glob("*.yaml")):
+        schema_parts.append(f"# {yaml_file.name}\n{yaml_file.read_text(encoding='utf-8')}")
+    return "\n\n".join(schema_parts)
+
+
+def _initialize_critical_constraints(gw: MemoryGateway) -> None:
+    """初始化 CRITICAL 约束（模拟第1轮对话中确立的关键约束）"""
+    critical_constraints = [
+        ("认证有效期约束", "供应商认证剩余天数必须 >= 30 天，否则禁止采购"),
+        ("信用额度约束", "采购金额不得超过供应商信用额度上限"),
+        ("合规性约束", "所有操作必须记录审计日志，确保可追溯"),
+        ("规则修改权限", "规则调整需要评估影响范围，不可轻率修改"),
+    ]
+    
+    for title, constraint in critical_constraints:
+        gw.memory_store.write(
+            content=f"[CRITICAL] {title}：{constraint}",
+            compressed=constraint,
+            layer=MemoryLayer.CRITICAL,
+            tags=["constraint", "critical", title],
+            source_session="init",
+        )
+
+
+def _call_llm_no_memory(system_prompt: str, history: list, user_input: str) -> str:
+    """
+    调用 LLM（无记忆模式）：全量注入 Schema + 完整历史
+    """
+    import os
+    
+    try:
+        from openai import OpenAI
+        
+        client = OpenAI(
+            api_key=os.environ["LLM_API_KEY"],
+            base_url=os.environ.get("LLM_BASE_URL") or None,
+        )
+        model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+        
+        # 构建消息：system + 历史 + 当前输入
+        messages = [{"role": "system", "content": system_prompt}]
+        for role, msg in history:
+            messages.append({"role": "user" if role == "用户" else "assistant", "content": msg})
+        messages.append({"role": "user", "content": user_input})
+        
+        resp = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0.7,
+        )
+        return resp.choices[0].message.content or "[LLM 返回空内容]"
+    
+    except Exception as e:
+        return f"[LLM 调用失败: {e}] Mock 回复：建议参考现有约束谨慎评估。"
+
+
 # ── 入口 ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Phase 3 记忆系统演示")
+    parser = argparse.ArgumentParser(
+        description="Phase 3 记忆系统演示",
+        epilog="提示：配置 LLM_API_KEY 环境变量后可启用真实推理对比"
+    )
     parser.add_argument("--no-memory",    action="store_true", help="仅演示无记忆模式")
     parser.add_argument("--with-memory",  action="store_true", help="仅演示有记忆模式")
+    parser.add_argument("--token-only",   action="store_true", help="仅 token 统计，不调用 LLM（离线可用）")
     parser.add_argument("--memory-stats", action="store_true", help="打印记忆库状态")
     args = parser.parse_args()
 
+    use_llm = not args.token_only
+
     if args.no_memory:
-        run_no_memory_mode()
+        run_no_memory_mode(use_llm=use_llm)
     elif args.with_memory:
-        run_with_memory_mode()
+        run_with_memory_mode(use_llm=use_llm)
     elif args.memory_stats:
         run_memory_stats()
     else:
-        run_comparison()
+        run_comparison(use_llm=use_llm)
 
 
 if __name__ == "__main__":

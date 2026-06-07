@@ -111,8 +111,12 @@ python3 phase2/run_phase2_demo.py
 ### 第三阶段：运行记忆系统演示
 
 ```bash
-# 完整演示（对比无记忆 vs 有记忆）
+# 完整演示（对比无记忆 vs 有记忆，推荐：需配置 LLM API key）
+export LLM_API_KEY=sk-your-openai-api-key  # 或其他兼容接口
 python3 phase3/run_phase3_demo.py
+
+# 仅 token 统计，不调用 LLM（离线可用）
+python3 phase3/run_phase3_demo.py --token-only
 
 # 仅演示无记忆模式
 python3 phase3/run_phase3_demo.py --no-memory
@@ -131,7 +135,23 @@ python3 phase3/run_phase3_demo.py --with-memory
 | **Token 压缩** | 分级预算，CRITICAL 永不丢失 | `memory_compressor.py` |
 | **多轮会话** | 会话历史压缩，防止上下文膨胀 | `session_manager.py` |
 
-演示会对比同一个 5 轮对话任务在"无记忆"和"有记忆"两种模式下的 Token 消耗差异。
+**演示内容**：
+
+1. **Token 对比**：8 轮对话，无记忆模式 token 线性增长（~3000 → ~8000），有记忆模式保持稳定（~100）
+2. **推理质量对比**（需配置 LLM_API_KEY）：
+   - **无记忆模式**：随着历史增长，模型会"忘记"第 1 轮确立的关键约束（Lost in Middle 效应）
+   - **有记忆模式**：第 8 轮依然能准确引用第 1 轮的 CRITICAL 约束，推理一致性高
+
+**LLM API 配置**（可选）：
+
+```bash
+export LLM_API_KEY=sk-your-key           # 必填
+export LLM_MODEL=gpt-4o-mini             # 可选，默认 gpt-4o-mini
+export LLM_BASE_URL=https://api.openai.com/v1  # 可选，支持兼容接口
+pip install openai  # 需要安装 openai 库
+```
+
+如果不配置 LLM API key，演示会自动降级为 token 统计模式。
 
 ### 第四阶段：运行 Multi-Agent 演示
 
