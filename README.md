@@ -2,7 +2,10 @@
 
 这是一个完整可运行的最小本体引擎实现，便于更好地理解公众号文章《工程师的本体论》系列的内容。
 
-项目按阶段组织：**phase1** 为本体引擎核心（文章 5-7），**phase2** 为 Agent 交互层（文章 8-11）。
+项目按阶段组织：
+- **phase1** — 本体引擎核心（文章 5-7）
+- **phase2** — Agent 交互层（文章 8-11）
+- **phase3** — 记忆系统（文章 12-17）
 
 ---
 
@@ -20,13 +23,21 @@ ontology-engine-demo/
 │   ├── engine/                  # 五个核心组件
 │   └── test_scenarios.py        # 三场景测试脚本
 │
-└── phase2/                      # 第二阶段：OAG / Agent 交互（文章 8-11）
-    ├── capability_provider.py   # Schema → Function Calling 能力清单
-    ├── llm_client.py            # 双路径 LLM / mock
-    ├── mock_agent.py            # 离线 mock Agent
-    ├── agent_gateway.py         # 发现→调用→拒绝→重试
-    ├── audit_query.py           # 决策血统审计查询
-    └── run_phase2_demo.py       # 演示入口
+├── phase2/                      # 第二阶段：OAG / Agent 交互（文章 8-11）
+│   ├── capability_provider.py   # Schema → Function Calling 能力清单
+│   ├── llm_client.py            # 双路径 LLM / mock
+│   ├── mock_agent.py            # 离线 mock Agent
+│   ├── agent_gateway.py         # 发现→调用→拒绝→重试
+│   ├── audit_query.py           # 决策血统审计查询
+│   └── run_phase2_demo.py       # 演示入口
+│
+└── phase3/                      # 第三阶段：记忆系统（文章 12-17）
+    ├── memory_store.py          # 记忆存储（SQLite + 四层分类 + 生命周期）
+    ├── memory_retriever.py      # 精准检索（层级定位 + 关键词匹配）
+    ├── memory_compressor.py     # Token 预算压缩（分级保留）
+    ├── session_manager.py       # 多轮会话管理
+    ├── memory_gateway.py        # 记忆集成网关（包装 Phase 2）
+    └── run_phase3_demo.py       # 演示入口（对比无记忆 vs 有记忆）
 ```
 
 ---
@@ -38,6 +49,7 @@ ontology-engine-demo/
 - Python 3.8+
 - **phase1**：无外部依赖（仅 Python 标准库）
 - **phase2**：可选 `openai`（真实 LLM 路径）；未安装则自动 fallback 到 mock
+- **phase3**：无外部依赖（使用 SQLite，Python 标准库自带）
 
 ### 第一阶段：运行本体引擎
 
@@ -77,6 +89,31 @@ python3 phase2/run_phase2_demo.py
 ```
 
 > API key 请通过环境变量或本地 `.env` 配置，**不要提交到仓库**（已在 `.gitignore` 中排除）。
+
+### 第三阶段：运行记忆系统演示
+
+```bash
+# 完整演示（对比无记忆 vs 有记忆）
+python3 phase3/run_phase3_demo.py
+
+# 仅演示无记忆模式
+python3 phase3/run_phase3_demo.py --no-memory
+
+# 仅演示有记忆模式
+python3 phase3/run_phase3_demo.py --with-memory
+```
+
+**记忆系统核心能力**：
+
+| 能力 | 说明 | 对应组件 |
+|------|------|---------|
+| **分层存储** | CRITICAL/RULE/CONTEXT/BACKGROUND 四层分类 | `memory_store.py` |
+| **生命周期管理** | HOT → WARM → COLD → ARCHIVED 状态机 | `memory_store.py` |
+| **精准检索** | 层级定位优先于关键词匹配 | `memory_retriever.py` |
+| **Token 压缩** | 分级预算，CRITICAL 永不丢失 | `memory_compressor.py` |
+| **多轮会话** | 会话历史压缩，防止上下文膨胀 | `session_manager.py` |
+
+演示会对比同一个 5 轮对话任务在"无记忆"和"有记忆"两种模式下的 Token 消耗差异。
 
 ---
 
