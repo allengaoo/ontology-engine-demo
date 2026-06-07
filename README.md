@@ -6,6 +6,8 @@
 - **phase1** — 本体引擎核心（文章 5-7）
 - **phase2** — Agent 交互层（文章 8-11）
 - **phase3** — 记忆系统（文章 12-17）
+- **phase4** — Multi-Agent 架构（文章 18-23）
+- **phase5** — 意图编译与生产化（文章 24-29）
 
 ---
 
@@ -31,13 +33,28 @@ ontology-engine-demo/
 │   ├── audit_query.py           # 决策血统审计查询
 │   └── run_phase2_demo.py       # 演示入口
 │
-└── phase3/                      # 第三阶段：记忆系统（文章 12-17）
-    ├── memory_store.py          # 记忆存储（SQLite + 四层分类 + 生命周期）
-    ├── memory_retriever.py      # 精准检索（层级定位 + 关键词匹配）
-    ├── memory_compressor.py     # Token 预算压缩（分级保留）
-    ├── session_manager.py       # 多轮会话管理
-    ├── memory_gateway.py        # 记忆集成网关（包装 Phase 2）
-    └── run_phase3_demo.py       # 演示入口（对比无记忆 vs 有记忆）
+├── phase3/                      # 第三阶段：记忆系统（文章 12-17）
+│   ├── memory_store.py          # 记忆存储（SQLite + 四层分类 + 生命周期）
+│   ├── memory_retriever.py      # 精准检索（层级定位 + 关键词匹配）
+│   ├── memory_compressor.py     # Token 预算压缩（分级保留）
+│   ├── session_manager.py       # 多轮会话管理
+│   ├── memory_gateway.py        # 记忆集成网关（包装 Phase 2）
+│   └── run_phase3_demo.py       # 演示入口（对比无记忆 vs 有记忆）
+│
+├── phase4/                      # 第四阶段：Multi-Agent（文章 18-23）
+│   ├── multi_agent_router.py    # Router：能力路由 + 记忆层权限隔离
+│   ├── intent_agent.py          # 意图解析 Agent
+│   ├── ontology_agent.py        # 规则分析 Agent
+│   ├── sim_agent.py             # 约束模拟 Agent
+│   ├── agent_coordinator.py     # DAG 执行 + 写冲突处理
+│   └── run_phase4_demo.py       # 三 Agent 8 步协作演示
+│
+└── phase5/                      # 第五阶段：意图编译与生产化（文章 24-29）
+    ├── intent_compiler.py       # 自然语言 → 合法操作编译
+    ├── confidence_engine.py     # 置信度总线传播
+    ├── injection_guard.py       # Prompt Injection 防御
+    ├── schema_updater.py        # 活 Schema + 语义 MVCC
+    └── run_phase5_demo.py       # 演示入口
 ```
 
 ---
@@ -50,6 +67,7 @@ ontology-engine-demo/
 - **phase1**：无外部依赖（仅 Python 标准库）
 - **phase2**：可选 `openai`（真实 LLM 路径）；未安装则自动 fallback 到 mock
 - **phase3**：无外部依赖（使用 SQLite，Python 标准库自带）
+- **phase4 / phase5**：依赖 phase1-3，无额外第三方库
 
 ### 第一阶段：运行本体引擎
 
@@ -114,6 +132,38 @@ python3 phase3/run_phase3_demo.py --with-memory
 | **多轮会话** | 会话历史压缩，防止上下文膨胀 | `session_manager.py` |
 
 演示会对比同一个 5 轮对话任务在"无记忆"和"有记忆"两种模式下的 Token 消耗差异。
+
+### 第四阶段：运行 Multi-Agent 演示
+
+```bash
+python3 phase4/run_phase4_demo.py
+```
+
+**Multi-Agent 核心能力**：
+
+| 能力 | 说明 | 对应组件 |
+|------|------|---------|
+| **Router 路由** | 最小权限原则，记忆层读写隔离 | `multi_agent_router.py` |
+| **专业化 Agent** | Intent / Ontology / Sim 三 Agent 分工 | `intent_agent.py` 等 |
+| **DAG 执行** | 依赖声明、前置检查、循环检测 | `agent_coordinator.py` |
+| **写冲突处理** | 乐观锁 + 置信度仲裁 | `agent_coordinator.py` |
+
+演示完整 8 步协作流程：意图解析 → 规则分析 → 方案生成 → 模拟否决 → 修正 → 执行。
+
+### 第五阶段：运行意图编译与生产化演示
+
+```bash
+python3 phase5/run_phase5_demo.py
+```
+
+**Phase 5 核心能力**：
+
+| 能力 | 说明 | 对应组件 |
+|------|------|---------|
+| **意图编译** | 自然语言 → 合法操作，歧义处理 | `intent_compiler.py` |
+| **置信度总线** | 跨层置信度传播与衰减 | `confidence_engine.py` |
+| **注入防御** | 意图清洗 + 内核强制校验 | `injection_guard.py` |
+| **活 Schema** | 不停机更新 + 语义 MVCC | `schema_updater.py` |
 
 ---
 
@@ -200,6 +250,6 @@ MIT License
 
 ---
 
-**最后更新**：2026-06-01
+**最后更新**：2026-06-07
 
 如果这个 Demo 对你有帮助，欢迎 Star ⭐
