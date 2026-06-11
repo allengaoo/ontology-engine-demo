@@ -20,12 +20,23 @@ MemoryStore — 记忆的存储与生命周期管理
   hot → warm → cold → archived
               ↓
           deprecated（关联规则变更时）
+
+双层记忆模型（参考 AgentScope 分层记忆设计）：
+  第一层·流水账（DailyLogWriter）
+    - 原始事实，只追加，不去重
+    - 写入路径：memory/daily/YYYY-MM-DD.jsonl
+    - 每次 write() 调用后同步追加，不影响 SQLite 主存储
+
+  第二层·策划后记忆（MemoryStore SQLite）
+    - 经过 layer/tags/confidence 标注的结构化条目
+    - LLM 二次加工后的版本（由调用方写入）
+    - 检索、压缩、淘汰都针对此层
 """
 
 from __future__ import annotations
 
-import sqlite3
 import json
+import sqlite3
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -116,13 +127,16 @@ class MemoryStore:
     CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
     """
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, daily_log_dir: Optional[Path] = None):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(self._SCHEMA)
         self._conn.commit()
+        # 流水账写入器：若未指定目录，与 db 文件同目录
+        log_dir = daily_log_dir or self.db_path.parent
+        self.daily_log = DailyLogWriter(log_dir)
         self._seed_critical_memories()
 
     # ── 写入 ─────────────────────────────────────────────────────────────
@@ -136,7 +150,16 @@ class MemoryStore:
         source_session: Optional[str] = None,
         confidence: float = 1.0,
     ) -> Memory:
-        """写入一条记忆（Classification：调用方负责指定 layer 和 tags）"""
+        """写入一条记忆（Classification：调用方负责指定 layer 和 tags）
+
+        tags 来源规范（确保检索时能精准命中）：
+          CRITICAL 层: Schema 字段名 + 参数名（初始化时一次性写入）
+          RULE 层:     操作 ID + 规则 ID（来自操作执行结果）
+          CONTEXT 层:  操作 ID + 触发规则 ID（来自被拒绝的操作）
+
+        同时向流水账（DailyLogWriter）追加原始记录，供审计和回溯。
+        流水账写失败不影响主流程。
+        """
         memory = Memory(
             id=f"mem-{uuid.uuid4().hex[:8]}",
             content=content,
@@ -154,6 +177,13 @@ class MemoryStore:
             memory.to_dict(),
         )
         self._conn.commit()
+        # 同步追加到流水账（第一层·原始记录）
+        self.daily_log.append(
+            content=content,
+            layer=layer.value,
+            tags=tags,
+            session=source_session,
+        )
         return memory
 
     def write_critical(self, content: str, compressed: str, tags: List[str]) -> Memory:
@@ -307,3 +337,70 @@ class MemoryStore:
                 compressed=seed["compressed"],
                 tags=seed["tags"],
             )
+
+
+# ── 第一层·流水账 ──────────────────────────────────────────────────────────────
+
+class DailyLogWriter:
+    """
+    每日流水账写入器（对应 AgentScope 的 memory/YYYY-MM-DD.md 机制）
+
+    设计原则：
+      - 只追加，不去重，不修改
+      - 与 SQLite 主存储（MemoryStore）完全独立——两层互不干扰
+      - 流水账记录"原始事实"；MemoryStore 记录"经分类标注的结构化记忆"
+      - 第二层（MemoryStore）是检索和压缩的目标；
+        第一层是审计、回溯的原始存档
+
+    文件路径：<base_dir>/daily/YYYY-MM-DD.jsonl
+    每行一条 JSON，格式：
+      {"ts": ISO8601, "session": str, "layer": str, "content": str, "tags": [...]}
+    """
+
+    def __init__(self, base_dir: Path):
+        self.log_dir = Path(base_dir) / "daily"
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+    def append(
+        self,
+        content: str,
+        layer: str,
+        tags: List[str],
+        session: Optional[str] = None,
+    ) -> None:
+        """追加一条原始事实记录（fire-and-forget，不抛异常）"""
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            log_path = self.log_dir / f"{today}.jsonl"
+            entry = {
+                "ts": datetime.now().isoformat(),
+                "session": session or "",
+                "layer": layer,
+                "content": content,
+                "tags": tags,
+            }
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            pass  # 流水账写失败不中断主流程
+
+    def read_today(self) -> List[Dict[str, Any]]:
+        """读取今日流水账（供调试/审计）"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        log_path = self.log_dir / f"{today}.jsonl"
+        if not log_path.exists():
+            return []
+        entries = []
+        with log_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+        return entries
+
+    def count_today(self) -> int:
+        """返回今日流水账条数"""
+        return len(self.read_today())

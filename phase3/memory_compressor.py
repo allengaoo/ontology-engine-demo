@@ -17,12 +17,21 @@ Token 预算分级（来自设计文档 §3.1 能力3）：
   - RULE/CONTEXT 超出预算时截断最低优先级条目
   - BACKGROUND 整体可选，Token 不足时直接跳过
 
+双触发压缩（参考 AgentScope triggerMessages + triggerTokens 设计）：
+  压缩不只在 token 超出时触发，消息数量达到阈值也应触发。
+  两个条件满足任一即开始裁剪，避免"token 还没超但记忆已经很多"的情况。
+
+  CompressTrigger 封装两种触发条件：
+    - token_threshold：当前检索结果总 token 数超过此值
+    - message_threshold：当前检索结果条数超过此值
+  都不配置则退化为原有行为（按预算截断）。
+
 Token 计数：粗估，1 token ≈ 1.5 个汉字 或 4 个英文字符
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from .memory_retriever import RetrievalResult
@@ -49,6 +58,33 @@ class TokenBudget:
     @property
     def total(self) -> int:
         return self.critical + self.rule + self.context + self.background + self.buffer
+
+
+@dataclass
+class CompressTrigger:
+    """
+    双触发条件（参考 AgentScope triggerMessages + triggerTokens）
+
+    两种触发方式：
+      1. token_threshold：检索结果估算 token 数超过此值时触发裁剪
+      2. message_threshold：检索结果总条数超过此值时触发裁剪
+
+    满足任一条件即触发压缩，两个都设为 0 表示"始终按预算截断"（原有行为）。
+
+    示例：
+      CompressTrigger(token_threshold=3000, message_threshold=20)
+      → 超过 3000 tokens 或超过 20 条时，主动触发压缩
+    """
+    token_threshold:   int = 0   # 0 = 不按 token 数触发（仅靠预算截断）
+    message_threshold: int = 0   # 0 = 不按消息数触发
+
+    def should_compress(self, total_tokens: int, total_messages: int) -> bool:
+        """判断是否触发压缩"""
+        if self.token_threshold > 0 and total_tokens >= self.token_threshold:
+            return True
+        if self.message_threshold > 0 and total_messages >= self.message_threshold:
+            return True
+        return False
 
 
 @dataclass
@@ -99,8 +135,28 @@ class CompressedContext:
 class MemoryCompressor:
     """按 Token 预算将检索结果压缩成可注入的上下文"""
 
-    def __init__(self, budget: Optional[TokenBudget] = None):
+    def __init__(
+        self,
+        budget: Optional[TokenBudget] = None,
+        trigger: Optional[CompressTrigger] = None,
+    ):
         self.budget = budget or TokenBudget()
+        self.trigger = trigger or CompressTrigger()
+
+    def needs_compress(self, retrieval: RetrievalResult) -> bool:
+        """
+        判断是否需要触发压缩（双触发检查）
+
+        使用场景：调用方可在 compress() 之前先调用此方法，
+        决定是否跳过压缩（当记忆量很少时直接全量注入更快）。
+        """
+        total_messages = len(retrieval.all_memories)
+        # 粗估总 token（不需要精确，仅用于触发判断）
+        total_tokens = sum(
+            estimate_tokens(m.compressed or m.content)
+            for m in retrieval.all_memories
+        )
+        return self.trigger.should_compress(total_tokens, total_messages)
 
     def compress(self, retrieval: RetrievalResult) -> CompressedContext:
         """

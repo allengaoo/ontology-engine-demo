@@ -35,28 +35,47 @@ from phase4.agent_coordinator import DAGExecutor
 
 def run_phase4_demo():
     """Phase 4 完整演示"""
-    
+
     # 初始化
     memory_dir = DEMOCODE_ROOT / "memory"
+    plan_dir = DEMOCODE_ROOT / "plans"
     router = MultiAgentRouter(memory_dir=str(memory_dir))
-    
+
     # 注册三个Agent
     router.register_agent("IntentAgent", IntentAgent())
     router.register_agent("OntologyAgent", OntologyAgent())
     router.register_agent("SimAgent", SimAgent())
-    
-    # 创建DAG执行器
-    executor = DAGExecutor(router)
-    
+
+    # 创建DAG执行器（启用 Plan Mode，计划写入 plans/ 目录）
+    executor = DAGExecutor(router, plan_dir=plan_dir)
+
     # 用户输入
     task = Task(
         description="把认证有效期阈值从30天调整为15天，但要确保安全",
         user_id="user-001",
         type=TaskType.UNKNOWN
     )
-    
-    # 执行DAG
+
+    # ── Plan Mode：先生成计划，再执行 ────────────────────────────────────
+    print(f"\n{'=' * 60}")
+    print(f"  [Plan Mode] 生成执行计划（只读，不修改状态）")
+    print(f"{'=' * 60}")
+    plan_text = executor.plan(task)
+    print(plan_text)
+
+    print(f"\n{'─' * 60}")
+    print(f"  计划确认，开始执行 DAG")
+    print(f"{'─' * 60}")
+
+    # ── DAG 执行 ──────────────────────────────────────────────────────
     result = executor.execute(task)
+
+    # ── 检查后台任务 reminders ────────────────────────────────────────
+    reminders = router.bg_tasks.pop_pending_reminders()
+    if reminders:
+        print(f"\n[System Reminder] 后台任务完成通知（将注入下一轮 system prompt）：")
+        for r in reminders:
+            print(f"  {r}")
     
     # 打印结果
     print(f"\n{'=' * 60}")
@@ -90,7 +109,9 @@ def run_phase4_demo():
     print("1. 制衡机制：SimAgent在Step 3拒绝了OntologyAgent的方案v1")
     print("2. 反馈循环：OntologyAgent根据拒绝原因修正为方案v2")
     print("3. 权限隔离：各Agent只读写自己权限范围内的记忆层")
-    print("4. 可追溯性：完整记录了决策路径和每一步的理由")
+    print("4. 上下文切片：每个Agent只注入本轮需要的信息（build_agent_context）")
+    print("5. Plan Mode：执行前生成可读计划，意图与执行物理解耦")
+    print("6. 后台任务：bg_tasks.pop_pending_reminders() 演示 system-reminder 机制")
     
     return result
 

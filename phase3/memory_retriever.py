@@ -46,7 +46,9 @@ _LAYER_KEYWORDS: Dict[MemoryLayer, List[str]] = {
     ],
 }
 
-# 实体关键词映射，用于从意图中快速定位相关标签
+# Schema 驱动的实体关键词映射
+# 工程实践中应从本体 Schema 字段名自动构建，这里为 demo 手动列出
+# 词汇表 = Schema 实体名 + 规则名 + 字段名 + 允许值集合，词汇量有上限
 _ENTITY_KEYWORDS: Dict[str, List[str]] = {
     "供应商":  ["供应商", "vendor", "supplier", "S-ACME", "S-BETA", "S-GAMMA"],
     "认证":    ["认证", "certification", "ISO", "证书", "有效期"],

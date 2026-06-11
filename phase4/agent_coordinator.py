@@ -1,14 +1,17 @@
 """
-Agent Coordinator：DAG执行器 + 冲突检测
+Agent Coordinator：DAG执行器 + 冲突检测 + 计划持久化
 
 功能：
   1. 构建Agent依赖关系（DAG）
   2. 拓扑排序生成执行顺序
   3. 循环检测与终止
   4. 写冲突检测与解决
+  5. Plan Mode：执行前生成可读计划摘要，意图与执行物理解耦
+     （参考 AgentScope Plan Mode，计划持久化到 workspace/plans/）
 """
 
-from typing import Dict, List
+from pathlib import Path
+from typing import Dict, List, Optional
 from .multi_agent_router import Task, TaskType
 
 
@@ -45,14 +48,68 @@ class AgentCoordinator:
 
 
 class DAGExecutor:
-    """DAG执行器"""
-    
+    """DAG执行器（含 Plan Mode）"""
+
     MAX_RETRY = 3  # 最大重试次数
-    
-    def __init__(self, router):
+
+    def __init__(self, router, plan_dir: Optional[Path] = None):
         self.router = router
         self.coordinator = AgentCoordinator(router)
-    
+        # 计划文件目录（Plan Mode）；不指定则不写磁盘
+        self.plan_dir = Path(plan_dir) if plan_dir else None
+        if self.plan_dir:
+            self.plan_dir.mkdir(parents=True, exist_ok=True)
+
+    def plan(self, task: Task) -> str:
+        """
+        Plan Mode：只读规划阶段，不执行任何状态变更。
+
+        输出执行计划摘要（纯文本），可：
+          1. 展示给用户确认
+          2. 持久化到 plan_dir/plan-<task_id>.md
+          3. 作为 execute() 的前置步骤
+
+        这实现了文章 021 描述的"意图与执行物理解耦"设计：
+        计划在磁盘上可查看、可修改，执行前有显式确认窗口。
+        """
+        import uuid
+        from datetime import datetime
+        plan_id = f"plan-{uuid.uuid4().hex[:6]}"
+        lines = [
+            f"# 执行计划 {plan_id}",
+            f"创建时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"",
+            f"## 任务描述",
+            f"{task.description}",
+            f"",
+            f"## 执行步骤（DAG 拓扑顺序）",
+        ]
+        order = self.coordinator.build_execution_order()
+        for i, agent in enumerate(order, 1):
+            deps = self.coordinator.AGENT_DEPENDENCIES.get(agent, [])
+            dep_str = f"（依赖：{', '.join(deps)}）" if deps else "（无依赖）"
+            lines.append(f"  Step {i}. {agent} {dep_str}")
+        lines += [
+            f"",
+            f"## 记忆层权限",
+            f"  IntentAgent   → 读写 CONTEXT",
+            f"  OntologyAgent → 读 CRITICAL/RULE/CONTEXT，写 RULE",
+            f"  SimAgent      → 读 CRITICAL/RULE，写 CONTEXT（验证结果）",
+            f"",
+            f"## 终止条件",
+            f"  成功：SimAgent 验证通过",
+            f"  失败：OntologyAgent 重试超过 {self.MAX_RETRY} 次",
+        ]
+        plan_text = "\n".join(lines)
+
+        # 持久化到磁盘（若配置了 plan_dir）
+        if self.plan_dir:
+            plan_path = self.plan_dir / f"{plan_id}.md"
+            plan_path.write_text(plan_text, encoding="utf-8")
+            print(f"  [Plan Mode] 计划已写入：{plan_path}")
+
+        return plan_text
+
     def execute(self, task: Task) -> dict:
         """执行DAG流程"""
         retry_count = 0
