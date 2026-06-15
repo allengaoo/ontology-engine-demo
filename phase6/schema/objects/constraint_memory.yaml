@@ -1,0 +1,15 @@
+id: ConstraintMemory
+label: 架构硬约束记忆
+type: object
+version: "1.0"
+extends: _memory_base
+description: 不可违反的架构/合规约束，通常 tier=hot
+
+specific_properties:
+  rule_id:
+    type: string
+    required: true
+  enforcement:
+    type: enum
+    values: [reject, warn]
+    default: reject

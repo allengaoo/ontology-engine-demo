@@ -1,0 +1,10 @@
+id: bootstrap_seed
+label: 冷启动种子写入
+type: action
+description: 从 seeds/ 或种子包写入 tier=hot 约束，零 LLM
+
+steps:
+  - load_seed_files
+  - validate_schema
+  - write_instances
+  - rebuild_index

@@ -1,0 +1,14 @@
+# 编码闭域：架构语义层（layer）
+# tier（hot/warm/cold/archive）在 _memory_base 中定义，与 layer 正交
+
+layers:
+  - id: CROSS_CUTTING
+    label: 横切约束（架构硬规则、ADR）
+  - id: DOMAIN
+    label: 领域层（实体、仓储、业务规则）
+  - id: APPLICATION
+    label: 应用服务层
+  - id: ADAPTER
+    label: 接口适配层（API、Handler）
+  - id: PLATFORM
+    label: 平台基础设施（DB、Cache、MQ）

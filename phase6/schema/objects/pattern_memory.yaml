@@ -1,0 +1,17 @@
+id: PatternMemory
+label: 可复用模式记忆
+type: object
+version: "1.0"
+extends: _memory_base
+description: 可复用的架构/代码模式
+
+specific_properties:
+  problem:
+    type: string
+    required: false
+  solution:
+    type: string
+    required: false
+  when_to_use:
+    type: string
+    required: false

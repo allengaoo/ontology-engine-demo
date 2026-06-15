@@ -1,0 +1,18 @@
+id: AntiPatternMemory
+label: 反模式/踩坑记忆
+type: object
+version: "1.0"
+extends: _memory_base
+description: 已知反模式与检测信号
+
+specific_properties:
+  detection_signals:
+    type: list
+    required: false
+  fix_path:
+    type: string
+    required: false
+  severity:
+    type: enum
+    values: [low, medium, high]
+    default: medium

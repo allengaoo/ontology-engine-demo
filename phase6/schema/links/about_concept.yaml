@@ -1,0 +1,6 @@
+id: about_concept
+label: 记忆关联概念
+from: MemoryObject
+to: Concept
+storage_field: about_concepts
+description: hybrid_search 反向索引入口

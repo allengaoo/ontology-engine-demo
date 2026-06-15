@@ -1,0 +1,48 @@
+# 记忆对象基础 Schema（供各 ObjectType 继承）
+# 非独立类型，不应直接实例化
+
+_meta:
+  type: base_schema
+  version: "1.0"
+
+base_properties:
+  id:
+    type: string
+    required: true
+  title:
+    type: string
+    required: true
+  object_type:
+    type: string
+    required: true
+  layer:
+    type: string
+    required: true
+    enum_source: schema/_config/layers.yaml
+  tier:
+    type: string
+    required: true
+    enum: [hot, warm, cold, archive]
+  tags:
+    type: list
+    required: true
+  confidence:
+    type: float
+    default: 1.0
+  schema_version:
+    type: integer
+    default: 1
+  access_count:
+    type: integer
+    default: 0
+  source_session:
+    type: string
+    required: false
+
+# Link 字段（存于 front-matter 列表）
+link_fields:
+  about_rules: { type: list, description: "关联规则 ID，如 CR-001" }
+  about_concepts: { type: list, description: "检索用概念标签" }
+  derived_from: { type: list, description: "来源记忆/任务 ID" }
+  cites_files: { type: list, description: "关联代码路径" }
+  contradicts: { type: list, description: "矛盾记忆 ID" }
