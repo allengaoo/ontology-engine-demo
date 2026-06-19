@@ -30,6 +30,7 @@ class OntologyRegistry:
         self.object_types: Dict[str, dict] = {}
         self.layers: Set[str] = set()
         self.tiers: Set[str] = {"hot", "warm", "cold", "archive"}
+        self.statuses: Set[str] = {"active", "deprecated", "superseded", "rolled_back"}
         self._load()
 
     def _load(self) -> None:
@@ -74,6 +75,10 @@ class OntologyRegistry:
         tier = instance.get("tier")
         if tier and tier not in self.tiers:
             errors.append(f"非法 tier: {tier}")
+
+        status = instance.get("status")
+        if status and status not in self.statuses:
+            errors.append(f"非法 status: {status}")
 
         # 类型特有必填（骨架：只检查 required: true 的 specific_properties）
         spec = self.object_types[obj_type].get("specific_properties", {})

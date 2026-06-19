@@ -29,9 +29,17 @@ base_properties:
   confidence:
     type: float
     default: 1.0
+  status:
+    type: string
+    required: false
+    enum: [active, deprecated, superseded, rolled_back]
+    default: active
   schema_version:
     type: integer
     default: 1
+  migration_batch:
+    type: string
+    required: false
   access_count:
     type: integer
     default: 0
@@ -44,5 +52,6 @@ link_fields:
   about_rules: { type: list, description: "关联规则 ID，如 CR-001" }
   about_concepts: { type: list, description: "检索用概念标签" }
   derived_from: { type: list, description: "来源记忆/任务 ID" }
+  supersedes: { type: list, description: "替代的旧版本记忆 ID" }
   cites_files: { type: list, description: "关联代码路径" }
   contradicts: { type: list, description: "矛盾记忆 ID" }

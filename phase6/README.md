@@ -24,7 +24,7 @@ phase6/
 ├── hybrid_search.py        # 概念/tag 检索 + 关键词降级
 ├── memory_injector.py      # tier 策略 + InjectManifest
 ├── memory_actions.py       # write / deprecate（校验后写入）
-├── schema_evolution.py     # 演进报告（骨架，030 扩展）
+├── schema_evolution.py     # SchemaSnapshot / migration_batch / rollback（031）
 └── run_phase6_demo.py      # 端到端演示入口
 ```
 
@@ -33,15 +33,18 @@ phase6/
 ```bash
 cd democode
 python3 phase6/run_phase6_demo.py
+python3 phase6/run_schema_evolution_demo.py --rule-id ARCH-001 --to-version 2
 ```
+
+`run_schema_evolution_demo.py` 会读取 `democode/.env` 中的 `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`，调用大模型生成迁移评审意见。
 
 ## 阶段规划
 
 | 阶段 | 文章 | 代码增量 |
 |------|------|----------|
 | 029 骨架 | 记忆本体内核 | Schema + Registry + Graph + inject 骨架 |
-| 030 | 治理与控制平面 | GC、retire、schema_evolution 完整实现 |
-| 031 | 调度即查询 | intent_classifier 漏斗 |
+| 030 | Software 3.0 中文脉络 | 本体在 LLM OS 中的位置说明 |
+| 031 | 记忆 Schema 演进 | SchemaSnapshot、迁移批次、supersede、回滚骨架 |
 | 032 | 记忆经济学 | injection_budget 实验与对比 |
 | 033 | 双本体联邦 | 第二套语义域 objects |
 | 034 | 端到端演练 | 接 phase5 schema_updater 级联 |

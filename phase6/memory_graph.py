@@ -46,6 +46,14 @@ class MemoryNode:
         return float(self.meta.get("confidence", 1.0))
 
     @property
+    def status(self) -> str:
+        return self.meta.get("status", "active")
+
+    @property
+    def schema_version(self) -> int:
+        return int(self.meta.get("schema_version", 1))
+
+    @property
     def tags(self) -> List[str]:
         return list(self.meta.get("tags", []))
 
@@ -116,3 +124,6 @@ class MemoryGraph:
     def find_by_rule(self, rule_id: str) -> List[MemoryNode]:
         ids = self._rule_to_ids.get(rule_id, [])
         return [self.nodes[i] for i in ids if i in self.nodes]
+
+    def find_active_by_rule(self, rule_id: str) -> List[MemoryNode]:
+        return [n for n in self.find_by_rule(rule_id) if n.status == "active"]

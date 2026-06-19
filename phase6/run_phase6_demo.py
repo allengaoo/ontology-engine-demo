@@ -25,7 +25,7 @@ from memory_graph import MemoryGraph
 from hybrid_search import HybridSearch
 from memory_injector import MemoryInjector
 from memory_actions import MemoryActions
-from schema_evolution import analyze_graph
+from schema_evolution import analyze_graph, create_snapshot, evolve_rule
 from llm_coder import LLMCoder, load_env
 from code_validator import CodeValidator
 
@@ -112,16 +112,28 @@ def main() -> None:
         else:
             print("  端侧小模型 + 本体记忆注入 → 生成代码通过约束校验 ✓")
 
-    sep("Step 7: Schema 演进健康度（骨架）")
+    sep("Step 7: Schema 演进模拟（快照 + 级联迁移）")
+    snapshot = create_snapshot(version=2, changed_rule="ARCH-001", note="031 demo")
+    print(f"  snapshot: v{snapshot.version} rule={snapshot.changed_rule} at={snapshot.created_at}")
+    batch = evolve_rule(graph, actions, rule_id="ARCH-001", to_version=2)
+    print(f"  migration_batch: {batch.summary()}")
+
+    # 重新加载图，验证注入窗口收敛（只注入 v2）
+    graph.load()
+    injector = MemoryInjector(graph, schema_root)
+    injector.set_schema_window(active_version=2, compatible_versions=[2])
+    manifest_v2 = injector.inject(task, keywords)
+    print(f"  v2 InjectManifest: {manifest_v2.summary()}")
+
     report = analyze_graph(graph)
-    print(f"  {report.summary()}")
+    print(f"  evolution_report: {report.summary()}")
     for w in report.warnings:
         print(f"    ⚠ {w}")
 
     sep("完成")
     print("  记忆本体内核端到端演示结束。")
     print("  核心验证：InjectManifest → qwen3-32b → ConstraintMemory 校验")
-    print("  完整 GC / 级联 / 意图漏斗见 Phase 6 后续文章与代码扩展。")
+    print("  本演示新增：SchemaSnapshot + migration_batch + supersede 迁移。")
 
 
 if __name__ == "__main__":

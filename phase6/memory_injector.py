@@ -36,6 +36,8 @@ class MemoryInjector:
         self.graph = graph
         self.schema_root = schema_root
         self._budget = self._load_budget()
+        self.active_schema_version = 1
+        self.compatible_schema_versions: List[int] = [1]
 
     def _load_budget(self) -> dict:
         path = self.schema_root / "_config" / "injection_budget.yaml"
@@ -49,7 +51,10 @@ class MemoryInjector:
         total_chars = 0
 
         # Rule: tier=hot 全量注入
-        hot_nodes = self.graph.find_by_tier("hot")
+        hot_nodes = [
+            n for n in self.graph.find_by_tier("hot")
+            if self._is_injectable(n)
+        ]
         manifest.tiers["hot"] = len(hot_nodes)
         for node in hot_nodes:
             block = self._format_node(node)
@@ -59,7 +64,10 @@ class MemoryInjector:
 
         # warm：图检索
         search = HybridSearch(self.graph)
-        warm_nodes = [n for n in search.search(keywords, limit=5) if n.tier != "hot"]
+        warm_nodes = [
+            n for n in search.search(keywords, limit=5)
+            if n.tier != "hot" and self._is_injectable(n)
+        ]
         manifest.tiers["warm"] = len(warm_nodes)
         for node in warm_nodes:
             if node.id in manifest.memory_ids:
@@ -72,6 +80,17 @@ class MemoryInjector:
         manifest.context_text = "\n\n---\n\n".join(sections)
         manifest.estimated_tokens = max(1, total_chars // 2)  # 粗估中文 token
         return manifest
+
+    def set_schema_window(self, active_version: int, compatible_versions: List[int] | None = None) -> None:
+        self.active_schema_version = active_version
+        if compatible_versions is None:
+            compatible_versions = [active_version]
+        self.compatible_schema_versions = compatible_versions
+
+    def _is_injectable(self, node: MemoryNode) -> bool:
+        if node.status in {"deprecated", "superseded", "rolled_back"}:
+            return False
+        return node.schema_version in self.compatible_schema_versions
 
     def _format_node(self, node: MemoryNode) -> str:
         header = (
