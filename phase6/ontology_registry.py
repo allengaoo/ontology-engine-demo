@@ -29,8 +29,8 @@ class OntologyRegistry:
         self.schema_root = schema_root
         self.object_types: Dict[str, dict] = {}
         self.layers: Set[str] = set()
-        self.tiers: Set[str] = {"hot", "warm", "cold", "archive"}
-        self.statuses: Set[str] = {"active", "deprecated", "superseded", "rolled_back"}
+        self.tiers: Set[str] = {"hot", "warm", "cold", "archive", "archived"}
+        self.statuses: Set[str] = {"active", "deprecated", "superseded", "rolled_back", "evicted"}
         self._load()
 
     def _load(self) -> None:
