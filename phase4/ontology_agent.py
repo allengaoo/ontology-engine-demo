@@ -26,9 +26,11 @@ class OntologyAgent:
         """执行规则分析与方案生成"""
         print(f"\n[{self.name}] 开始执行任务... (方案 v{self.version})")
         
-        # 模拟读取CRITICAL约束
-        critical_rules = self._get_critical_rules()
+        # 读取 CRITICAL 约束（优先 manifest，回退 mock）
+        critical_rules = self._get_critical_rules(task)
         print(f"  读取 CRITICAL 层：{len(critical_rules)} 条约束")
+        if task.context.get("manifest_constraints"):
+            print(f"    （来自 InjectManifest：{[c.get('id') for c in critical_rules[:4]]}）")
         
         # 解析IntentAgent的意图
         intent = task.context.get("intent", {})
@@ -51,8 +53,19 @@ class OntologyAgent:
             next_agent="SimAgent"  # 建议交给SimAgent验证
         )
     
-    def _get_critical_rules(self) -> list:
-        """获取CRITICAL约束（模拟）"""
+    def _get_critical_rules(self, task: Task) -> list:
+        """获取 CRITICAL 约束：P1 优先读 manifest，否则 mock。"""
+        constraints = (task.context or {}).get("manifest_constraints")
+        if constraints:
+            return [
+                {
+                    "id": c.get("id"),
+                    "desc": c.get("desc") or c.get("title"),
+                    "rule_id": c.get("rule_id"),
+                    "enforcement": c.get("enforcement"),
+                }
+                for c in constraints
+            ]
         return [
             {"id": "CR-001", "desc": "认证剩余天数 >= 30 天"},
             {"id": "CR-002", "desc": "供应商状态=active 且合同状态=valid"},
@@ -62,7 +75,19 @@ class OntologyAgent:
     
     def _generate_initial_proposal(self, intent: dict, critical_rules: list) -> dict:
         """生成初始方案"""
-        # 简化逻辑：直接采用意图中的目标值
+        if intent.get("type") == "kafka_idempotency_fix":
+            patterns = intent.get("pattern_ids") or []
+            return {
+                "proposal_id": f"v{self.version}",
+                "action": "apply_idempotency_pattern",
+                "target": intent.get("target_file", "procurement_service.py"),
+                "measures": ["idempotency_key", "processed_events 去重表"],
+                "pattern_ids": patterns,
+                "constraints_honored": [c.get("id") for c in critical_rules],
+                "confidence": 0.85,
+            }
+
+        # 阈值调整（023 场景）
         from_val = intent.get("from_value", 30)
         to_val = intent.get("to_value", 15)
         

@@ -8,6 +8,7 @@
 - **phase3** — 记忆系统（文章 12-17）
 - **phase4** — Multi-Agent 架构（文章 18-23）
 - **phase5** — 意图编译与生产化（文章 24-29）
+- **phase6** — 记忆本体内核（文章 29-36）
 
 ---
 
@@ -49,12 +50,23 @@ ontology-engine-demo/
 │   ├── agent_coordinator.py     # DAG 执行 + 写冲突处理
 │   └── run_phase4_demo.py       # 三 Agent 8 步协作演示
 │
-└── phase5/                      # 第五阶段：意图编译与生产化（文章 24-29）
-    ├── intent_compiler.py       # 自然语言 → 合法操作编译
-    ├── confidence_engine.py     # 置信度总线传播
-    ├── injection_guard.py       # Prompt Injection 防御
-    ├── schema_updater.py        # 活 Schema + 语义 MVCC
-    └── run_phase5_demo.py       # 演示入口
+├── phase5/                      # 第五阶段：意图编译与生产化（文章 24-29）
+│   ├── intent_compiler.py       # 自然语言 → 合法操作编译
+│   ├── confidence_engine.py     # 置信度总线传播
+│   ├── injection_guard.py       # Prompt Injection 防御
+│   ├── schema_updater.py        # 活 Schema + 语义 MVCC
+│   └── run_phase5_demo.py       # 演示入口
+│
+└── phase6/                      # 第六阶段：记忆本体内核（文章 29-36）
+    ├── schema/                  # 记忆本体 YAML Schema
+    ├── instances/               # code-arch 域实例
+    ├── instances_purchasing/    # purchasing 域实例
+    ├── memory_graph.py          # 图加载 + 概念索引
+    ├── memory_injector.py       # tier 预算注入 + InjectManifest
+    ├── intent_router.py         # 意图 → 域/tier/budget（034）
+    ├── federated_graph.py       # 双本体联邦（035）
+    ├── memory_gc.py             # GC / 控制平面（033）
+    └── run_e2e_demo.py          # 八步集成测试（036）
 ```
 
 ---
@@ -68,6 +80,7 @@ ontology-engine-demo/
 - **phase2**：可选 `openai`（真实 LLM 路径）；未安装则自动 fallback 到 mock
 - **phase3**：无外部依赖（使用 SQLite，Python 标准库自带）
 - **phase4 / phase5**：依赖 phase1-3，无额外第三方库
+- **phase6**：依赖 phase1-5 概念；LLM 脚本可选读取 `democode/.env`
 
 ### 第一阶段：运行本体引擎
 
@@ -185,6 +198,42 @@ python3 phase5/run_phase5_demo.py
 | **注入防御** | 意图清洗 + 内核强制校验 | `injection_guard.py` |
 | **活 Schema** | 不停机更新 + 语义 MVCC | `schema_updater.py` |
 
+### 第六阶段：运行记忆本体内核与端到端演练
+
+```bash
+cd democode
+
+# 记忆图 + 注入 + 检索
+python3 phase6/run_phase6_demo.py
+
+# 控制平面 GC（033）
+python3 phase6/run_governance_demo.py
+
+# 意图路由（034）
+python3 phase6/run_intent_router_demo.py
+
+# 双本体联邦（035）
+python3 phase6/run_federation_demo.py
+
+# 八步集成测试（036）——演进 → GC → 路由 → 联邦注入 → 校验
+python3 phase6/run_e2e_demo.py
+python3 phase6/run_e2e_demo.py --dry-run        # 不写盘、不调 LLM
+python3 phase6/run_e2e_demo.py --strict-domains # 仅注入路由指定域
+```
+
+**Phase 6 四平面架构**：
+
+| 平面 | 模块 | 文章 |
+|------|------|------|
+| 接入 | MemoryGraph · HybridSearch · MemoryInjector | 029 |
+| 演进 | schema_evolution · MigrationBatch | 031 |
+| 治理 | MemoryGC · MemoryAdmin | 033 |
+| 路由 | IntentRouter · FederatedGraph | 034-035 |
+
+涉及 LLM 的脚本读取 `democode/.env` 中的 `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`（已在 `.gitignore` 排除，勿提交）。
+
+详见 [phase6/README.md](phase6/README.md)。
+
 ---
 
 ## 🏗️ 架构设计（phase1）
@@ -270,6 +319,6 @@ MIT License
 
 ---
 
-**最后更新**：2026-06-07
+**最后更新**：2026-06-22
 
 如果这个 Demo 对你有帮助，欢迎 Star ⭐

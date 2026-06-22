@@ -63,6 +63,19 @@ class BudgetConfig:
     def tier_limit(self, tier: str) -> int:
         return int(getattr(self, tier, 0))
 
+    def scaled(self, multiplier: float) -> "BudgetConfig":
+        """按倍数缩放各 tier 预算（IntentRouter budget_multiplier 使用）"""
+        m = max(0.0, multiplier)
+        return BudgetConfig(
+            total_budget_tokens=max(0, int(self.total_budget_tokens * m)),
+            hot=max(0, int(self.hot * m)),
+            warm=max(0, int(self.warm * m)),
+            cold=max(0, int(self.cold * m)),
+            reserve=max(0, int(self.reserve * m)),
+            compress_enabled=self.compress_enabled,
+            inject_order=list(self.inject_order),
+        )
+
 
 # ---------------------------------------------------------------------------
 # InjectManifest — 注入结果（透明接口）
@@ -211,7 +224,7 @@ class MemoryInjector:
         self.compatible_schema_versions = compatible_versions
 
     def _is_injectable(self, node: MemoryNode) -> bool:
-        if node.status in {"deprecated", "superseded", "rolled_back"}:
+        if node.status in {"deprecated", "superseded", "rolled_back", "evicted"}:
             return False
         return node.schema_version in self.compatible_schema_versions
 

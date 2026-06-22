@@ -26,10 +26,12 @@ class IntentAgent:
         
         # 简化实现：关键词提取
         desc = task.description
-        
+        desc_lower = desc.lower()
+
         # 判断意图类型
-        if "阈值" in desc and "调整" in desc:
-            # 提取阈值调整意图
+        if any(k in desc_lower for k in ("kafka", "idempotency", "幂等", "procurement")):
+            intent = self._parse_procurement_fix(desc, task)
+        elif "阈值" in desc and ("调整" in desc or "→" in desc or "->" in desc):
             intent = self._parse_threshold_adjustment(desc)
         else:
             intent = {"type": "unknown", "raw": desc}
@@ -68,3 +70,15 @@ class IntentAgent:
             result["constraint"] = "needs_safety_verification"
         
         return result
+
+    def _parse_procurement_fix(self, desc: str, task: Task) -> dict:
+        """采购 / Kafka 幂等修复意图（P1：可引用 manifest patterns）"""
+        patterns = (task.context or {}).get("manifest_patterns", [])
+        pattern_ids = [p.get("id") for p in patterns if p.get("id")]
+        return {
+            "type": "kafka_idempotency_fix",
+            "target_file": "procurement_service.py",
+            "raw": desc,
+            "pattern_ids": pattern_ids,
+            "needs_compliance_check": True,
+        }

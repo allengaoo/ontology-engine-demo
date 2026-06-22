@@ -190,6 +190,26 @@ class FederatedInjectManifest:
         )
 
 
+def build_routed_domain_budgets(
+    domain_configs: List[DomainConfig],
+    route_domains: List[str],
+    budget_multiplier: float,
+    auxiliary_multiplier: float = 0.5,
+) -> Dict[str, BudgetConfig]:
+    """
+    根据 IntentRouter 的路由决策，为各域生成缩放后的 BudgetConfig。
+
+    - route_domains 内的域：budget_multiplier
+    - 其余域（辅助域）：auxiliary_multiplier（默认 0.5）
+    """
+    result: Dict[str, BudgetConfig] = {}
+    for d_cfg in domain_configs:
+        base = d_cfg.budget or BudgetConfig()
+        mult = budget_multiplier if d_cfg.name in route_domains else auxiliary_multiplier
+        result[d_cfg.name] = base.scaled(mult)
+    return result
+
+
 class FederatedInjector:
     """
     从 FederatedGraph 中按域独立注入，合并为 FederatedInjectManifest。
@@ -213,19 +233,24 @@ class FederatedInjector:
         task: str,
         keywords: List[str],
         domain_budgets: Optional[Dict[str, BudgetConfig]] = None,
+        domains: Optional[List[str]] = None,
     ) -> FederatedInjectManifest:
         """
         按域独立注入，返回联邦 manifest。
 
         domain_budgets: 可以为每个域指定不同的 BudgetConfig；
                         未指定时使用域的 DomainConfig.budget 或默认值。
+        domains:        若指定，只注入列表内的域；None 表示注入全部已加载域。
         """
         fed_manifest = FederatedInjectManifest(task=task)
+        allowed = set(domains) if domains else None
 
         # 按 priority 排序，priority 小的域先处理（其 hot 内容先出现在 context 中）
         ordered_domains = sorted(self.fed_graph.domains, key=lambda d: d.priority)
 
         for d_cfg in ordered_domains:
+            if allowed is not None and d_cfg.name not in allowed:
+                continue
             injector = self._injectors.get(d_cfg.name)
             if not injector:
                 continue

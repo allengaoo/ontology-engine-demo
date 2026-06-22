@@ -34,7 +34,7 @@ class SimAgent:
         print(f"  当前供应商：{len(suppliers)} 家")
         
         # 模拟验证
-        validation_result = self._simulate_constraint(proposal, suppliers)
+        validation_result = self._simulate_constraint(proposal, suppliers, task)
         
         if validation_result["passed"]:
             print(f"  ✓ 验证通过")
@@ -73,13 +73,18 @@ class SimAgent:
             },
         ]
     
-    def _simulate_constraint(self, proposal: dict, suppliers: list) -> dict:
+    def _simulate_constraint(self, proposal: dict, suppliers: list, task: Task) -> dict:
         """模拟约束验证"""
         action = proposal.get("action")
         
         if action == "update_threshold":
             # 阈值调整场景
             new_threshold = proposal.get("to_value", 30)
+
+            # manifest 中的 BIZ-CN-001 等约束作为审计参考
+            manifest_cn = (task.context or {}).get("manifest_constraints", [])
+            if manifest_cn:
+                print(f"  manifest 约束参与验证：{[c.get('id') for c in manifest_cn]}")
             
             # 检查所有供应商是否满足新阈值
             violated_suppliers = []
@@ -94,6 +99,17 @@ class SimAgent:
                     "violated_suppliers": [s["name"] for s in violated_suppliers]
                 }
         
+        elif action == "apply_idempotency_pattern":
+            # Kafka 幂等修复：不改变供应商认证阈值，合规约束仍满足
+            constraints = (task.context or {}).get("manifest_constraints", [])
+            cert_rules = [c for c in constraints if "cert" in str(c.get("rule_id", "")).lower()
+                          or "认证" in str(c.get("desc", ""))]
+            return {
+                "passed": True,
+                "reason": "幂等方案不降低认证阈值，"
+                          + (f"manifest 约束 {cert_rules[0]['id']} 仍有效" if cert_rules else "无阈值变更"),
+            }
+
         elif action == "keep_threshold_add_warning":
             # 保持阈值+增加预警，无风险
             return {

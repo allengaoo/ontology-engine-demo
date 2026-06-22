@@ -33,6 +33,7 @@ secrets.json
 logs/
 *.log
 plans/
+workspace/plans/
 phase3/memory_db/*.db
 phase4/memory/
 

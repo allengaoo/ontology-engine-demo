@@ -23,6 +23,7 @@ class AgentCoordinator:
         "IntentAgent": [],
         "OntologyAgent": ["IntentAgent"],
         "SimAgent": ["OntologyAgent"],
+        "CoderAgent": ["SimAgent"],
     }
     
     def __init__(self, router):
