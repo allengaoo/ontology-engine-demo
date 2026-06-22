@@ -223,12 +223,12 @@ python3 phase6/run_e2e_demo.py --strict-domains # 仅注入路由指定域
 
 **Phase 6 四平面架构**：
 
-| 平面 | 模块 | 文章 |
-|------|------|------|
-| 接入 | MemoryGraph · HybridSearch · MemoryInjector | 029 |
-| 演进 | schema_evolution · MigrationBatch | 031 |
-| 治理 | MemoryGC · MemoryAdmin | 033 |
-| 路由 | IntentRouter · FederatedGraph | 034-035 |
+| 平面 | 模块 |
+|------|------|
+| 接入 | MemoryGraph · HybridSearch · MemoryInjector |
+| 演进 | schema_evolution · MigrationBatch |
+| 治理 | MemoryGC · MemoryAdmin |
+| 路由 | IntentRouter · FederatedGraph |
 
 涉及 LLM 的脚本读取 `democode/.env` 中的 `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`（已在 `.gitignore` 排除，勿提交）。
 
