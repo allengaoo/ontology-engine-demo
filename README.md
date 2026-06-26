@@ -9,6 +9,7 @@
 - **phase4** — Multi-Agent 架构（文章 18-23）
 - **phase5** — 意图编译与生产化（文章 24-29）
 - **phase6** — 记忆本体内核（文章 29-36）
+- **phase7** — 记忆感知多智能体（文章 037）
 
 ---
 
@@ -57,16 +58,25 @@ ontology-engine-demo/
 │   ├── schema_updater.py        # 活 Schema + 语义 MVCC
 │   └── run_phase5_demo.py       # 演示入口
 │
-└── phase6/                      # 第六阶段：记忆本体内核（文章 29-36）
-    ├── schema/                  # 记忆本体 YAML Schema
-    ├── instances/               # code-arch 域实例
-    ├── instances_purchasing/    # purchasing 域实例
-    ├── memory_graph.py          # 图加载 + 概念索引
-    ├── memory_injector.py       # tier 预算注入 + InjectManifest
-    ├── intent_router.py         # 意图 → 域/tier/budget（034）
-    ├── federated_graph.py       # 双本体联邦（035）
-    ├── memory_gc.py             # GC / 控制平面（033）
-    └── run_e2e_demo.py          # 八步集成测试（036）
+├── phase6/                      # 第六阶段：记忆本体内核（文章 29-36）
+│   ├── schema/                  # 记忆本体 YAML Schema
+│   ├── instances/               # code-arch 域实例
+│   ├── instances_purchasing/    # purchasing 域实例
+│   ├── memory_graph.py          # 图加载 + 概念索引
+│   ├── memory_injector.py       # tier 预算注入 + InjectManifest
+│   ├── intent_router.py         # 意图 → 域/tier/budget（034）
+│   ├── federated_graph.py       # 双本体联邦（035）
+│   ├── memory_gc.py             # GC / 控制平面（033）
+│   └── run_e2e_demo.py          # 八步集成测试（036）
+│
+└── phase7/                      # 第七阶段：记忆感知多智能体（文章 037）
+    ├── agent_memory_scope.py    # 智能体 × 语义域 × 层级 × 读写权限
+    ├── memory_aware_coordinator.py  # 多智能体编排 + 注入 + 写回 + 计划模式
+    ├── memory_aware_agents.py   # 注入清单适配器
+    ├── manifest_parser.py       # 注入清单 → 约束记忆 / 模式记忆
+    ├── memory_writeback.py      # 决策记录写回
+    ├── coder_agent.py           # 代码生成 + 约束校验
+    └── run_multi_agent_memory_demo.py  # 演示入口
 ```
 
 ---
@@ -80,7 +90,7 @@ ontology-engine-demo/
 - **phase2**：可选 `openai`（真实 LLM 路径）；未安装则自动 fallback 到 mock
 - **phase3**：无外部依赖（使用 SQLite，Python 标准库自带）
 - **phase4 / phase5**：依赖 phase1-3，无额外第三方库
-- **phase6**：依赖 phase1-5 概念；LLM 脚本可选读取 `democode/.env`
+- **phase6 / phase7**：依赖 phase1-5 概念；LLM 脚本可选读取 `democode/.env`
 
 ### 第一阶段：运行本体引擎
 
@@ -234,6 +244,42 @@ python3 phase6/run_e2e_demo.py --strict-domains # 仅注入路由指定域
 
 详见 [phase6/README.md](phase6/README.md)。
 
+### 第七阶段：运行记忆感知多智能体
+
+```bash
+cd democode
+
+# 仅展示三个智能体各自的注入清单
+python3 phase7/run_multi_agent_memory_demo.py
+
+# P0：叠加 Phase 4 智能体 + 决策记录写回
+python3 phase7/run_multi_agent_memory_demo.py --with-agents --dry-run
+
+# P1：计划模式（权限范围 + 注入清单预览）
+python3 phase7/run_multi_agent_memory_demo.py --plan
+
+# P1：完整有向无环图（模拟验证制衡 + 代码生成智能体）
+python3 phase7/run_multi_agent_memory_demo.py --full --dry-run
+
+# P1：023 阈值制衡在联邦记忆上完整重跑
+python3 phase7/run_multi_agent_memory_demo.py --full --scenario threshold --dry-run
+```
+
+**Phase 7 核心能力**：
+
+| 能力 | 说明 | 对应组件 |
+|------|------|---------|
+| **权限范围映射** | 智能体 × 语义域 × 层级 × 读写权限 | `agent_memory_scope.py` |
+| **联邦注入** | 每回合按 scope 生成独立注入清单 | `memory_aware_coordinator.py` |
+| **清单解析** | 注入清单 → 约束记忆 / 模式记忆 | `manifest_parser.py` |
+| **制衡重试** | 模拟验证否决 → 反馈写回 → 本体修正 | `memory_aware_coordinator.py` |
+| **代码校验** | 代码生成智能体 + 约束语法树检查 | `coder_agent.py` |
+| **决策写回** | 每回合输出 → 决策记录（含血统） | `memory_writeback.py` |
+
+同一任务下，意图 / 本体 / 模拟验证三个智能体拿到的注入清单**不相同**——这是记忆层与多智能体层接线的核心验证点。
+
+详见 [phase7/README.md](phase7/README.md)。
+
 ---
 
 ## 🏗️ 架构设计（phase1）
@@ -319,6 +365,6 @@ MIT License
 
 ---
 
-**最后更新**：2026-06-22
+**最后更新**：2026-06-26
 
 如果这个 Demo 对你有帮助，欢迎 Star ⭐
