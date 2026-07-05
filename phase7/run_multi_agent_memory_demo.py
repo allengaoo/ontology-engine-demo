@@ -109,7 +109,16 @@ def main() -> None:
         action="store_true",
         help="P2：从 roles/*.toml 热加载权限范围，展示 diff 后再执行",
     )
+    parser.add_argument(
+        "--no-llm",
+        action="store_true",
+        help="强制 stub，不调用大模型（离线演示）",
+    )
     args = parser.parse_args()
+
+    from llm_chat import llm_mode_label, set_force_stub  # noqa: E402
+    if args.no_llm:
+        set_force_stub(True)
 
     schema_root = PHASE6 / "schema"
     domain_configs = build_domain_configs(schema_root)
@@ -120,6 +129,7 @@ def main() -> None:
     print("=" * 60)
     print("  Phase 7 · Memory-Aware Multi-Agent")
     print(f"  场景: {args.scenario}")
+    print(f"  LLM  : {llm_mode_label()}")
     print("=" * 60)
     for d, n in counts.items():
         print(f"  域={d:<14} 节点数={n}")

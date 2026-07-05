@@ -1,0 +1,170 @@
+"""
+llm_chat — 跨 Phase 共享的 LLM 调用（真实 / stub fallback）
+
+Phase 7 / Phase 8 的 Agent 节点统一走此模块：
+  - 检测到 LLM_API_KEY 且 openai 可用 → 真实 chat.completions
+  - 否则 → 返回 None，由 Agent 自行 fallback 到 stub
+
+.env（democode/.env，与 phase6 llm_coder 相同）：
+  LLM_API_KEY
+  LLM_BASE_URL   （可选，默认 DashScope 兼容接口）
+  LLM_MODEL      （可选，默认 qwen3-32b；你本地可设为 qwen3.7-max 等）
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+_ENV_LOADED = False
+_FORCE_STUB = False
+
+
+def set_force_stub(enabled: bool = True) -> None:
+    """演示脚本 --no-llm 时强制 stub，不发起 API 调用。"""
+    global _FORCE_STUB
+    _FORCE_STUB = enabled
+
+
+def _load_dotenv_once() -> None:
+    global _ENV_LOADED
+    if _ENV_LOADED:
+        return
+    _ENV_LOADED = True
+
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(env_path, override=False)
+    except ImportError:
+        with open(env_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key, value = key.strip(), value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+
+
+def is_llm_available() -> bool:
+    _load_dotenv_once()
+    if _FORCE_STUB:
+        return False
+    if not os.environ.get("LLM_API_KEY"):
+        return False
+    try:
+        import openai  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def llm_mode_label() -> str:
+    if _FORCE_STUB:
+        return "stub (--no-llm)"
+    if not is_llm_available():
+        key = "无 LLM_API_KEY" if not os.environ.get("LLM_API_KEY") else "openai 未安装"
+        return f"stub ({key})"
+    model = os.environ.get("LLM_MODEL", "qwen3-32b")
+    base = os.environ.get(
+        "LLM_BASE_URL",
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    return f"llm ({model} @ {base})"
+
+
+def _extract_json(text: str) -> Any:
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+    if m:
+        return json.loads(m.group(1).strip())
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        return json.loads(text[start : end + 1])
+    raise ValueError(f"无法从 LLM 响应解析 JSON: {text[:200]}...")
+
+
+def chat_complete(
+    system: str,
+    user: str,
+    *,
+    json_mode: bool = False,
+    temperature: float = 0.2,
+    max_tokens: int = 2048,
+) -> Optional[str]:
+    """
+    发起一次 chat completion。不可用时返回 None（不抛错）。
+    json_mode=True 时请求 JSON 对象响应（兼容 OpenAI response_format）。
+    """
+    if not is_llm_available():
+        return None
+
+    from openai import OpenAI
+
+    _load_dotenv_once()
+    base_url = os.environ.get(
+        "LLM_BASE_URL",
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    client = OpenAI(
+        api_key=os.environ["LLM_API_KEY"],
+        base_url=base_url,
+        timeout=120.0,
+    )
+    model = os.environ.get("LLM_MODEL", "qwen3-32b")
+
+    kwargs: Dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        # 与 phase6 llm_coder 一致：关闭 thinking，模拟端侧 token 约束
+        "extra_body": {"enable_thinking": False},
+    }
+    if json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
+
+    response = client.chat.completions.create(**kwargs)
+    content = response.choices[0].message.content
+    if not content:
+        raise RuntimeError("LLM 返回空 content")
+    return content.strip()
+
+
+def chat_json(system: str, user: str, **kwargs: Any) -> Optional[Any]:
+    """chat_complete + JSON 解析。失败时 raise，由 Agent 捕获后 fallback stub。"""
+    raw = chat_complete(system, user, json_mode=True, **kwargs)
+    if raw is None:
+        return None
+    return _extract_json(raw)
+
+
+def format_manifest_for_prompt(task_context: Dict[str, Any], max_items: int = 8) -> str:
+    """把 inject 解析结果压缩成 prompt 片段。"""
+    lines: List[str] = []
+    for c in (task_context.get("manifest_constraints") or [])[:max_items]:
+        lines.append(
+            f"- [{c.get('id')}] rule_id={c.get('rule_id')} "
+            f"enforcement={c.get('enforcement')} {c.get('how', c.get('title', ''))[:80]}"
+        )
+    for p in (task_context.get("manifest_patterns") or [])[:max_items]:
+        lines.append(f"- [{p.get('id')}] pattern: {p.get('how', p.get('title', ''))[:80]}")
+    preview = task_context.get("memory_context_preview")
+    if preview:
+        lines.append(f"\n--- InjectManifest context_text ---\n{preview[:1200]}")
+    return "\n".join(lines) if lines else "(无 manifest 约束)"

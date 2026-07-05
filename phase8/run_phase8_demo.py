@@ -33,6 +33,8 @@ from harness.ep_coordinator import EPCoordinator  # noqa: E402
 from memory_injector import BudgetConfig  # noqa: E402
 from roles_loader import load_scopes_from_dir  # noqa: E402
 
+from llm_chat import llm_mode_label, set_force_stub  # noqa: E402
+
 from phase4.multi_agent_router import Task  # noqa: E402
 
 
@@ -89,9 +91,16 @@ def main() -> None:
         help="演示场景",
     )
     parser.add_argument("--dry-run", action="store_true", help="writeback 不写盘")
+    parser.add_argument(
+        "--no-llm",
+        action="store_true",
+        help="强制 stub，不调用大模型（离线演示）",
+    )
     parser.add_argument("--reload-roles", action="store_true", help="从 roles/*.toml 加载 scope")
     parser.add_argument("--resume", metavar="EP_ID", help="从 DagState checkpoint 续跑")
     args = parser.parse_args()
+    if args.no_llm:
+        set_force_stub(True)
 
     schema_root = PHASE6 / "schema"
     domain_configs = build_domain_configs(schema_root)
@@ -102,6 +111,7 @@ def main() -> None:
     print("=" * 60)
     print("  Phase 8 · Harness + Ontology + BSA/CA")
     print(f"  场景: {args.scenario}")
+    print(f"  LLM  : {llm_mode_label()}")
     print("=" * 60)
     for d, n in counts.items():
         print(f"  域={d:<14} 节点数={n}")

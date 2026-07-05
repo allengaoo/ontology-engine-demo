@@ -39,15 +39,29 @@ python3 phase8/run_phase8_demo.py --reload-roles --dry-run
 ### P0 ✅
 
 - EP 状态机 + VerifyGate 三路 + AtomicityCheck
-- BSA / CA stub + `--dry-run` 三场景
-- DagState checkpoint + `--resume` 接口
-- `roles/bsa.toml` · `roles/ca.toml`
+- BSA / CA + **真实 LLM 路径**（`llm_chat.py`，无 key 时 stub）
+- `--no-llm` 强制离线演示
+- DagState checkpoint + `--resume`
 
 ### P1 待做
 
 - StructurePlan 正式 writeback 到 Ontology
-- 真实 LLM 路径（BSA / CA）
 - MMS 编排合并注释
+
+## LLM 配置
+
+```bash
+cp .env.example .env
+# LLM_API_KEY=...
+# LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1  # 可选
+# LLM_MODEL=qwen3.7-plus  # 可选
+pip install openai python-dotenv  # 可选
+```
+
+Phase 7：`python3 phase7/run_multi_agent_memory_demo.py --full --dry-run`  
+Phase 8：`python3 phase8/run_phase8_demo.py --dry-run`
+
+**不调 LLM 的模块**：IntentRouter、VerifyGate、AtomicityCheck、SimAgent（确定性模拟）。
 
 ## 文章
 

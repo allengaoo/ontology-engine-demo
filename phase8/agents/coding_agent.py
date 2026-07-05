@@ -1,18 +1,35 @@
 """
 CodingAgent (CA) — 按 Unit 生成 diff（Phase 8）
 
-职责：单 Unit fresh context → diff stub。禁止改 StructurePlan。
+有 LLM_API_KEY 时由大模型生成代码；否则 stub。
 """
 
 from __future__ import annotations
 
+import re
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+DEMOCODE_ROOT = Path(__file__).resolve().parent.parent.parent
+PHASE6 = DEMOCODE_ROOT / "phase6"
+sys.path.insert(0, str(PHASE6))
+sys.path.insert(0, str(DEMOCODE_ROOT))
 
 from agents.structure_plan import PlanUnit, UnitKind
 from code_validator import CodeValidator
+from llm_chat import chat_complete, format_manifest_for_prompt, is_llm_available  # noqa: E402
 
 from phase4.multi_agent_router import AgentResult, Task
+
+
+_CA_SYSTEM = """你是 CodingAgent（CA），只为单个 Unit 生成 Python 源码（不是 diff 格式，是完整文件内容）。
+要求：
+- 只输出纯 Python 代码，不要 markdown
+- 路径在 src/purchasing/ 或 tests/purchasing/
+- 领域层不得 import infrastructure/adapter/kafka_producer（ARCH-001）
+- 遵守 InjectManifest 中 enforcement=reject 的 ConstraintMemory"""
 
 
 @dataclass
@@ -35,7 +52,7 @@ class CodingResult:
 
 
 class CodingAgent:
-    """Coding Agent — Execute 阶段 LLM 节点（demo 用 stub）"""
+    """Coding Agent — Execute 阶段"""
 
     name = "CodingAgent"
 
@@ -47,10 +64,17 @@ class CodingAgent:
     ) -> UnitDiff:
         print(f"\n[{self.name}] 执行 Unit {unit.unit_id}: {unit.target_path}")
         force_impl_fail = task.context.get("_force_impl_fail") and unit.unit_id == "u1"
-        code = self._generate_code(unit, action, force_violation=force_impl_fail)
-        print(f"  生成 diff stub：{len(code.splitlines())} 行")
-        diff = UnitDiff(unit_id=unit.unit_id, target_path=unit.target_path, code=code)
-        return diff
+        if force_impl_fail and not is_llm_available():
+            code = self._generate_code_stub(unit, action, force_violation=True)
+        else:
+            code = self._generate_with_llm(unit, task, action, force_impl_fail)
+            if code is None:
+                code = self._generate_code_stub(unit, action, force_violation=force_impl_fail)
+            else:
+                print("  [LLM] 代码由大模型生成")
+
+        print(f"  生成代码：{len(code.splitlines())} 行")
+        return UnitDiff(unit_id=unit.unit_id, target_path=unit.target_path, code=code)
 
     def execute_unit_result(
         self,
@@ -64,12 +88,51 @@ class CodingAgent:
             output={"unit_id": diff.unit_id, "target_path": diff.target_path, "code": diff.code},
         )
 
+    def _generate_with_llm(
+        self,
+        unit: PlanUnit,
+        task: Task,
+        action: str,
+        force_violation: bool,
+    ) -> Optional[str]:
+        if force_violation:
+            return None
+        ctx = task.context or {}
+        bg = ctx.get("_bg_results", [])
+        verify_hint = ""
+        if bg:
+            verify_hint = f"\nVerifyGate 上轮失败（须修正）：{bg[-1].get('result')}"
+
+        user = (
+            f"任务：{task.description}\n"
+            f"StructurePlan action：{action}\n"
+            f"本 Unit：{unit.to_dict() if hasattr(unit, 'to_dict') else unit}\n"
+            f"目标路径：{unit.target_path}\n"
+            f"ConstraintMemory：\n{format_manifest_for_prompt(ctx)}"
+            f"{verify_hint}"
+        )
+        try:
+            raw = chat_complete(_CA_SYSTEM, user, max_tokens=2048)
+            if not raw:
+                return None
+            return self._strip_code_fence(raw)
+        except Exception as exc:
+            print(f"  ⚠ LLM 代码生成失败，fallback stub: {exc}")
+            return None
+
+    @staticmethod
+    def _strip_code_fence(text: str) -> str:
+        text = text.strip()
+        m = re.search(r"```(?:python)?\s*([\s\S]*?)```", text)
+        if m:
+            return m.group(1).strip()
+        return text
+
     def validate_diffs(
         self,
         diffs: List[UnitDiff],
         task: Task,
     ) -> Optional[str]:
-        """返回首个 violation detail，None 表示通过。"""
         graph = task.context.get("_code_arch_graph")
         if graph is None:
             return None
@@ -82,7 +145,7 @@ class CodingAgent:
                 return f"{v.rule or v.memory_id}: {v.detail}"
         return None
 
-    def _generate_code(
+    def _generate_code_stub(
         self,
         unit: PlanUnit,
         action: str,
