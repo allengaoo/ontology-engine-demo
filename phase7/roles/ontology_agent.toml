@@ -1,0 +1,12 @@
+# OntologyAgent — 本体智能体
+# 跨域读取，写入规则层，满额预算
+
+[memory]
+domains           = ["code-arch", "purchasing"]
+tiers             = ["hot", "warm"]
+read_layers       = ["critical", "rule", "context"]
+write_layers      = ["rule"]
+budget_multiplier = 1.0
+
+[concept_hints]
+keywords = ["architecture", "compliance", "pattern"]

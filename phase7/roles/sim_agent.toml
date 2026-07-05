@@ -1,0 +1,12 @@
+# SimAgent — 模拟验证智能体
+# 只读热层约束/规则，预算最小
+
+[memory]
+domains           = ["purchasing"]
+tiers             = ["hot"]
+read_layers       = ["critical", "rule"]
+write_layers      = ["context"]
+budget_multiplier = 0.6
+
+[concept_hints]
+keywords = ["compliance", "vendor"]

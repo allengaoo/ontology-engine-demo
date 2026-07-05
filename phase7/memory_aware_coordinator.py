@@ -22,6 +22,8 @@ sys.path.insert(0, str(DEMOCODE_ROOT / "phase7"))
 sys.path.insert(0, str(DEMOCODE_ROOT))
 
 from agent_memory_scope import AgentMemoryScope, AgentMemoryScopeRegistry  # noqa: E402
+from background_task_store import BackgroundTaskStore  # noqa: E402
+from scope_loader import diff_registries, load_scopes_from_dir  # noqa: E402
 from federated_graph import (  # noqa: E402
     DomainConfig,
     FederatedGraph,
@@ -136,6 +138,21 @@ class MemoryAwareCoordinator:
                 d_cfg.instances_root, registry
             )
         self.writeback = MemoryWriteback(self._actions_by_domain)
+        self.bg_store = BackgroundTaskStore()
+
+    def reload_scopes(self, roles_dir: Optional[Path] = None, show_diff: bool = True) -> str:
+        """
+        P2：从 roles/ TOML 热加载权限范围，不重启进程。
+        返回 diff 字符串，可打印或写入日志。
+        """
+        target = roles_dir or (Path(__file__).parent / "roles")
+        old_registry = self.scope_registry
+        new_registry = load_scopes_from_dir(target)
+        diff = diff_registries(old_registry, new_registry)
+        self.scope_registry = new_registry
+        if show_diff:
+            print(diff)
+        return diff
 
     def build_execution_order(self, include_coder: bool = False) -> List[str]:
         agents = self.FULL_DAG_AGENTS if include_coder else self.DAG_AGENTS
@@ -395,6 +412,12 @@ class MemoryAwareCoordinator:
         sim_passed = False
 
         while retry_count <= self.MAX_RETRY:
+            # P2：每轮开始前把 BackgroundTaskStore 里的结果注入 context
+            injected = self.bg_store.inject_into_context(task)
+            if injected:
+                self.bg_store.flush()
+                print(f"  [bg_store] 注入 {injected} 条后台结果到 task.context")
+
             # OntologyAgent
             label = "initial" if retry_count == 0 else f"retry-{retry_count}"
             turn = self._execute_turn(
@@ -422,6 +445,12 @@ class MemoryAwareCoordinator:
                 task.feedback = turn.agent_output.reason
                 task.context["sim_feedback"] = turn.agent_output.reason
                 turn.wake_mode = WakeMode.QUEUE_ONLY
+                # P2：详细分析结果提交到 BackgroundTaskStore，下一轮注入
+                self.bg_store.submit(
+                    "SimAgent",
+                    result=turn.agent_output.reason,
+                    label=f"rejection-{retry_count + 1}",
+                )
                 retry_count += 1
                 if retry_count > self.MAX_RETRY:
                     result.status = "failed"

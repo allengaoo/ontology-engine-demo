@@ -1,0 +1,12 @@
+# CodingAgent — 编码智能体（CA）
+# 单域 code-arch，按 Unit fresh context
+
+[memory]
+domains           = ["code-arch"]
+tiers             = ["hot"]
+read_layers       = ["critical", "rule", "pattern"]
+write_layers      = []
+budget_multiplier = 0.8
+
+[concept_hints]
+keywords = ["idempotency", "procurement", "architecture"]

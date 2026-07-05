@@ -10,6 +10,7 @@
 - **phase5** — 意图编译与生产化（文章 24-29）
 - **phase6** — 记忆本体内核（文章 29-36）
 - **phase7** — 记忆感知多智能体（文章 037）
+- **phase8** — Harness + 双 Agent（文章 041）
 
 ---
 
@@ -69,7 +70,7 @@ ontology-engine-demo/
 │   ├── memory_gc.py             # GC / 控制平面（033）
 │   └── run_e2e_demo.py          # 八步集成测试（036）
 │
-└── phase7/                      # 第七阶段：记忆感知多智能体（文章 037）
+├── phase7/                      # 第七阶段：记忆感知多智能体（文章 037）
     ├── agent_memory_scope.py    # 智能体 × 语义域 × 层级 × 读写权限
     ├── memory_aware_coordinator.py  # 多智能体编排 + 注入 + 写回 + 计划模式
     ├── memory_aware_agents.py   # 注入清单适配器
@@ -77,6 +78,19 @@ ontology-engine-demo/
     ├── memory_writeback.py      # 决策记录写回
     ├── coder_agent.py           # 代码生成 + 约束校验
     └── run_multi_agent_memory_demo.py  # 演示入口
+│
+└── phase8/                      # 第八阶段：Harness + BSA/CA（文章 041）
+    ├── harness/
+    │   ├── ep_coordinator.py    # EP 状态机：plan → execute → verify
+    │   ├── verify_gate.py       # 三路判定 PASS / FAIL_IMPL / FAIL_STRUCT
+    │   ├── atomicity_check.py   # StructurePlan 原子性校验
+    │   └── dag_state.py         # 断点续跑
+    ├── agents/
+    │   ├── business_structure_agent.py  # BSA：StructurePlan
+    │   ├── coding_agent.py              # CA：按 Unit 生成 diff
+    │   └── structure_plan.py            # Plan / Unit 数据结构
+    ├── roles/                   # BSA / CA scope 外置
+    └── run_phase8_demo.py       # 演示入口
 ```
 
 ---
@@ -90,7 +104,7 @@ ontology-engine-demo/
 - **phase2**：可选 `openai`（真实 LLM 路径）；未安装则自动 fallback 到 mock
 - **phase3**：无外部依赖（使用 SQLite，Python 标准库自带）
 - **phase4 / phase5**：依赖 phase1-3，无额外第三方库
-- **phase6 / phase7**：依赖 phase1-5 概念；LLM 脚本可选读取 `democode/.env`
+- **phase6 / phase7 / phase8**：依赖 phase1-5 概念；LLM 脚本可选读取 `democode/.env`
 
 ### 第一阶段：运行本体引擎
 
@@ -279,6 +293,34 @@ python3 phase7/run_multi_agent_memory_demo.py --full --scenario threshold --dry-
 同一任务下，意图 / 本体 / 模拟验证三个智能体拿到的注入清单**不相同**——这是记忆层与多智能体层接线的核心验证点。
 
 详见 [phase7/README.md](phase7/README.md)。
+
+### 第八阶段：Harness + BSA/CA（Phase 8）
+
+```bash
+cd democode
+
+# 完整 EP dry-run（Kafka 幂等场景）
+python3 phase8/run_phase8_demo.py --dry-run
+
+# FAIL_IMPL / FAIL_STRUCT 演示
+python3 phase8/run_phase8_demo.py --scenario impl_fail --dry-run
+python3 phase8/run_phase8_demo.py --scenario struct_fail --dry-run
+
+# 从 roles/*.toml 加载 scope
+python3 phase8/run_phase8_demo.py --reload-roles --dry-run
+```
+
+**Phase 8 核心能力**：
+
+| 能力 | 说明 | 对应组件 |
+|------|------|---------|
+| **EP 状态机** | plan → execute → verify 主循环 | `harness/ep_coordinator.py` |
+| **三路验证** | PASS / FAIL_IMPL / FAIL_STRUCT | `harness/verify_gate.py` |
+| **结构校验** | StructurePlan 路径白名单 + 依赖环 | `harness/atomicity_check.py` |
+| **双 Agent** | BSA 出 Plan，CA 按 Unit 写 diff | `agents/` |
+| **断点续跑** | DagState checkpoint | `harness/dag_state.py` |
+
+详见 [phase8/README.md](phase8/README.md)。
 
 ---
 

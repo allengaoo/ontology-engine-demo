@@ -104,6 +104,11 @@ def main() -> None:
         action="store_true",
         help="writeback 不写盘",
     )
+    parser.add_argument(
+        "--reload-roles",
+        action="store_true",
+        help="P2：从 roles/*.toml 热加载权限范围，展示 diff 后再执行",
+    )
     args = parser.parse_args()
 
     schema_root = PHASE6 / "schema"
@@ -124,6 +129,11 @@ def main() -> None:
 
     plan_dir = DEMOCODE_ROOT / "workspace" / "plans"
     coordinator = MemoryAwareCoordinator(fed, domain_configs, plan_dir=plan_dir)
+
+    if args.reload_roles:
+        print("\n── P2：从 roles/*.toml 热加载权限范围 ──────────────")
+        coordinator.reload_scopes(roles_dir=PHASE7 / "roles")
+        print("─" * 50)
 
     if args.plan:
         print("\n" + coordinator.plan(task, keywords, include_coder=True))

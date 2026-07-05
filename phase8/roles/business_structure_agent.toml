@@ -1,0 +1,12 @@
+# BusinessStructureAgent — 业务结构智能体（BSA）
+# 跨域读取，满额预算，只读不写
+
+[memory]
+domains           = ["code-arch", "purchasing"]
+tiers             = ["hot", "warm"]
+read_layers       = ["critical", "rule", "context"]
+write_layers      = []
+budget_multiplier = 1.0
+
+[concept_hints]
+keywords = ["architecture", "compliance", "pattern", "idempotency", "kafka"]

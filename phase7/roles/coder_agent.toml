@@ -1,0 +1,12 @@
+# CoderAgent — 代码生成智能体
+# 跨域读取模式/规则/约束，只读不写
+
+[memory]
+domains           = ["code-arch", "purchasing"]
+tiers             = ["hot", "warm"]
+read_layers       = ["critical", "rule", "pattern"]
+write_layers      = []
+budget_multiplier = 1.0
+
+[concept_hints]
+keywords = ["idempotency", "procurement", "architecture"]

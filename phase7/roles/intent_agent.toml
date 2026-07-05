@@ -1,0 +1,12 @@
+# IntentAgent — 意图解析智能体
+# 只读采购域上下文层，预算保守
+
+[memory]
+domains           = ["purchasing"]
+tiers             = ["hot", "warm"]
+read_layers       = ["context"]
+write_layers      = ["context"]
+budget_multiplier = 0.8
+
+[concept_hints]
+keywords = ["procurement", "vendor"]
