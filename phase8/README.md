@@ -43,10 +43,22 @@ python3 phase8/run_phase8_demo.py --reload-roles --dry-run
 - `--no-llm` 强制离线演示
 - DagState checkpoint + `--resume`
 
-### P1 待做
+### P1 ✅
 
-- StructurePlan 正式 writeback 到 Ontology
-- MMS 编排合并注释
+- Promotion Gate（`harness/ep_promotion.py`）
+- Session Flush（`harness/session_flush.py`）
+- EP 写回（`memory_ep_writeback.py`）
+- 跨 EP 演示（`run_cross_ep_demo.py`）
+
+```bash
+python3 phase8/run_cross_ep_demo.py --no-llm --dry-run
+python3 phase8/run_cross_ep_demo.py --no-llm
+```
+
+### P2 待做（Phase 9 MMS）
+
+- memory prompt 生产流水线
+- 多 EP 队列与 ep_runner 编排
 
 ## LLM 配置
 
@@ -65,4 +77,5 @@ Phase 8：`python3 phase8/run_phase8_demo.py --dry-run`
 
 ## 文章
 
-041《半闭域业务编码：Harness、本体与两个 Agent 怎么协同》
+041《半闭域业务编码：Harness、本体与两个 Agent 怎么协同》  
+042《半闭域编码的最后一个环：跨 EP 记忆与写回》
