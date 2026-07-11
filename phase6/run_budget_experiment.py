@@ -24,7 +24,11 @@ from pathlib import Path
 from typing import List, Optional
 
 PHASE6 = Path(__file__).parent
+DEMOCODE_ROOT = PHASE6.parent
 sys.path.insert(0, str(PHASE6))
+sys.path.insert(0, str(DEMOCODE_ROOT))
+
+from llm_chat import resolve_llm_model  # noqa: E402
 
 from code_validator import CodeValidator  # noqa: E402
 from llm_coder import LLMCoder, load_env  # noqa: E402
@@ -134,7 +138,7 @@ def main() -> None:
     injector.set_schema_window(active_version=2, compatible_versions=[1, 2])
 
     validator = CodeValidator(graph)
-    model = os.environ.get("LLM_MODEL", "qwen3-32b")
+    model = resolve_llm_model()
     coder = LLMCoder(model=model)
     has_llm = bool(os.environ.get("LLM_API_KEY", ""))
 

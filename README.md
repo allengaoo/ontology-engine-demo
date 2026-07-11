@@ -179,13 +179,12 @@ python3 phase3/run_phase3_demo.py --with-memory
    - **无记忆模式**：随着历史增长，模型会"忘记"第 1 轮确立的关键约束（Lost in Middle 效应）
    - **有记忆模式**：第 8 轮依然能准确引用第 1 轮的 CRITICAL 约束，推理一致性高
 
-**LLM API 配置**（可选）：
+**LLM API 配置**（可选，端侧 demo 固定 qwen3-32b）：
 
 ```bash
-export LLM_API_KEY=sk-your-key           # 必填
-export LLM_MODEL=gpt-4o-mini             # 可选，默认 gpt-4o-mini
-export LLM_BASE_URL=https://api.openai.com/v1  # 可选，支持兼容接口
-pip install openai  # 需要安装 openai 库
+cp .env.example .env
+# 填入 LLM_API_KEY；LLM_MODEL 默认 qwen3-32b（误填更大模型会自动降级）
+pip install openai python-dotenv
 ```
 
 如果不配置 LLM API key，演示会自动降级为 token 统计模式。
@@ -254,7 +253,7 @@ python3 phase6/run_e2e_demo.py --strict-domains # 仅注入路由指定域
 | 治理 | MemoryGC · MemoryAdmin |
 | 路由 | IntentRouter · FederatedGraph |
 
-涉及 LLM 的脚本读取 `democode/.env` 中的 `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`（已在 `.gitignore` 排除，勿提交）。
+涉及 LLM 的脚本读取 `democode/.env` 中的 `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`（已在 `.gitignore` 排除，勿提交）。**端侧编码 demo 统一走 `qwen3-32b`**；若 `.env` 误配 `qwen3.7-max` 等更大模型，`llm_chat.resolve_llm_model()` 会强制回退并告警。
 
 详见 [phase6/README.md](phase6/README.md)。
 
@@ -321,6 +320,32 @@ python3 phase8/run_phase8_demo.py --reload-roles --dry-run
 | **断点续跑** | DagState checkpoint | `harness/dag_state.py` |
 
 详见 [phase8/README.md](phase8/README.md)。
+
+### 第九阶段：Memory Prompt 流水线与多 EP 队列（Phase 9）
+
+```bash
+cd democode
+
+# 离线验证：不调 LLM，写回落隔离目录
+python3 phase9/run_phase9_demo.py --no-llm --dry-run
+python3 phase9/run_phase9_demo.py --no-llm
+
+# 真实模型验证：读取 democode/.env，模型锁定 qwen3-32b
+python3 phase9/run_phase9_demo.py
+```
+
+**Phase 9 核心能力**：
+
+| 能力 | 说明 | 对应组件 |
+|------|------|---------|
+| **Memory Prompt 四段流水线** | Intent → Retrieval → Compression → Manifest，输出可审计摘要 | `phase9/memory_prompt_builder.py` |
+| **多 EP 队列** | EP-1 PASS → promote → flush → reload → EP-2 依赖满足后执行 | `phase9/ep_queue.py` |
+| **跨 EP Manifest 差分** | EP-2 入队前快照，验证可见 EP-1 晋升的 DEC/PAT | `phase9/run_phase9_demo.py` |
+| **隔离写回** | 默认复制 instances 到临时 workspace，避免污染主记忆库 | `phase9/run_phase9_demo.py` |
+
+真实 qwen3-32b 验收：EP-2 读到 EP-1 写回后生成 3 Unit Plan，CA 逐 Unit 出码，VerifyGate 19 项 PASS；Compression 全局上限演示会裁剪 warm 节点并保护 hot/CRITICAL 约束。
+
+详见 [phase9/README.md](phase9/README.md)。
 
 ---
 

@@ -55,10 +55,15 @@ python3 phase8/run_cross_ep_demo.py --no-llm --dry-run
 python3 phase8/run_cross_ep_demo.py --no-llm
 ```
 
-### P2 待做（Phase 9 MMS）
+`run_cross_ep_demo.py` 默认把 instances 复制到临时隔离目录，写回不污染 `phase6/instances`；如需保留现场，可传 `--workspace ./workspace/cross_ep`。
 
-- memory prompt 生产流水线
-- 多 EP 队列与 ep_runner 编排
+### P2 → Phase 9 ✅ 骨架
+
+见 `democode/phase9/`：
+
+- Memory Prompt 四段流水线（`memory_prompt_builder.py`）
+- 多 EP 队列（`ep_queue.py`）
+- 演示：`python3 phase9/run_phase9_demo.py --no-llm --dry-run`
 
 ## LLM 配置
 
@@ -66,7 +71,7 @@ python3 phase8/run_cross_ep_demo.py --no-llm
 cp .env.example .env
 # LLM_API_KEY=...
 # LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1  # 可选
-# LLM_MODEL=qwen3.7-plus  # 可选
+# LLM_MODEL=qwen3-32b  # 端侧 32B，勿改更大模型
 pip install openai python-dotenv  # 可选
 ```
 

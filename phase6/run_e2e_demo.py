@@ -23,7 +23,11 @@ from datetime import datetime
 from pathlib import Path
 
 PHASE6 = Path(__file__).parent
+DEMOCODE_ROOT = PHASE6.parent
 sys.path.insert(0, str(PHASE6))
+sys.path.insert(0, str(DEMOCODE_ROOT))
+
+from llm_chat import resolve_llm_base_url, resolve_llm_model  # noqa: E402
 
 from code_validator import CodeValidator          # noqa: E402
 from federated_graph import (                     # noqa: E402
@@ -110,9 +114,8 @@ def sep(title: str, width: int = 68) -> None:
 
 def llm_review(prompt: str) -> str:
     api_key = os.environ.get("LLM_API_KEY", "")
-    base_url = os.environ.get("LLM_BASE_URL",
-                              "https://dashscope.aliyuncs.com/compatible-mode/v1")
-    model = os.environ.get("LLM_MODEL", "qwen3-32b")
+    base_url = resolve_llm_base_url()
+    model = resolve_llm_model()
     if not api_key:
         return "（未设置 LLM_API_KEY，跳过评审）"
     try:
@@ -329,7 +332,7 @@ def main() -> None:
     if args.dry_run or not api_key:
         print("  [跳过] dry-run 或未设置 LLM_API_KEY")
     else:
-        model = os.environ.get("LLM_MODEL", "qwen3-32b")
+        model = resolve_llm_model()
         coder = LLMCoder(model=model)
         combined = InjectManifest(
             task=task,

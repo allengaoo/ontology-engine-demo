@@ -8,17 +8,23 @@ LLMClient - 双路径 LLM 调用（真实 / mock fallback）
 .env 支持的变量：
     LLM_API_KEY   必填，API 密钥
     LLM_BASE_URL  可选，自定义接口地址（默认 https://api.openai.com/v1）
-    LLM_MODEL     可选，模型名称（默认 qwen3.7）
+    LLM_MODEL     可选，模型名称（默认 qwen3-32b，非 32B 会被 llm_chat 强制降级）
 """
 
 from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .mock_agent import AgentDecision, MockAgent
+
+DEMOCODE_ROOT = Path(__file__).resolve().parent.parent
+if str(DEMOCODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(DEMOCODE_ROOT))
+from llm_chat import resolve_llm_base_url, resolve_llm_model  # noqa: E402
 
 _ENV_LOADED = False
 
@@ -76,8 +82,8 @@ class LLMClient:
     @property
     def mode_label(self) -> str:
         if self._mode == "llm":
-            model = os.environ.get("LLM_MODEL", "qwen3.7-plus")
-            base_url = os.environ.get("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+            model = resolve_llm_model()
+            base_url = resolve_llm_base_url()
             return f"llm ({model} @ {base_url})"
         return "mock (离线兜底)"
 
@@ -105,8 +111,8 @@ class LLMClient:
         from openai import OpenAI
 
         api_key = os.environ["LLM_API_KEY"]
-        base_url = os.environ.get("LLM_BASE_URL") or None
-        model = os.environ.get("LLM_MODEL", "qwen3.7-plus")
+        base_url = resolve_llm_base_url()
+        model = resolve_llm_model()
 
         client = OpenAI(api_key=api_key, base_url=base_url)
         openai_tools = [

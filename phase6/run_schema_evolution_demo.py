@@ -16,7 +16,11 @@ import sys
 from pathlib import Path
 
 PHASE6 = Path(__file__).parent
+DEMOCODE_ROOT = PHASE6.parent
 sys.path.insert(0, str(PHASE6))
+sys.path.insert(0, str(DEMOCODE_ROOT))
+
+from llm_chat import resolve_llm_base_url, resolve_llm_model  # noqa: E402
 
 from llm_coder import load_env  # noqa: E402
 from memory_actions import MemoryActions  # noqa: E402
@@ -34,11 +38,8 @@ def sep(title: str) -> None:
 
 def llm_review(prompt: str) -> tuple[bool, str]:
     api_key = os.environ.get("LLM_API_KEY", "")
-    base_url = os.environ.get(
-        "LLM_BASE_URL",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    )
-    model = os.environ.get("LLM_MODEL", "qwen3-32b")
+    base_url = resolve_llm_base_url()
+    model = resolve_llm_model()
 
     if not api_key:
         return False, "LLM_API_KEY 未设置，跳过大模型评审。"

@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 DEMOCODE_ROOT = Path(__file__).parent.parent
@@ -29,7 +31,7 @@ sys.path.insert(0, str(PHASE8))
 sys.path.insert(0, str(DEMOCODE_ROOT))
 
 from federated_graph import DomainConfig, FederatedGraph  # noqa: E402
-from harness.ep_coordinator import EPCoordinator  # noqa: E402
+from harness.ep_coordinator import EPCoordinator, FederatedInjectorWrapper  # noqa: E402
 from harness.ep_promotion import EPPromotionGate  # noqa: E402
 from harness.session_flush import SessionFlush  # noqa: E402
 from memory_ep_writeback import MemoryEPWriteback  # noqa: E402
@@ -40,6 +42,21 @@ from llm_chat import llm_mode_label, set_force_stub  # noqa: E402
 
 from phase4.multi_agent_router import Task  # noqa: E402
 from run_phase8_demo import build_domain_configs, SCENARIOS  # noqa: E402
+
+
+def isolate_instances(domain_configs, ws: Path) -> None:
+    """把各域 base instances 复制进 workspace，写回全部落隔离目录，零污染。"""
+    ws.mkdir(parents=True, exist_ok=True)
+    for d in domain_configs:
+        src = Path(d.instances_root)
+        dst = ws / d.name
+        if dst.exists():
+            shutil.rmtree(dst)
+        if src.exists():
+            shutil.copytree(src, dst)
+        else:
+            dst.mkdir(parents=True, exist_ok=True)
+        d.instances_root = dst
 
 
 def build_actions(domain_configs) -> dict:
@@ -146,7 +163,7 @@ def main() -> None:
         "--workspace",
         type=Path,
         default=None,
-        help="可选：instances 写到独立 workspace（避免污染主 instances）",
+        help="隔离目录（默认临时目录，跑完清理）；写回不污染 phase6/instances",
     )
     args = parser.parse_args()
     if args.no_llm:
@@ -155,16 +172,15 @@ def main() -> None:
     schema_root = PHASE6 / "schema"
     domain_configs = build_domain_configs(schema_root)
 
+    # 默认隔离：base instances 复制到 workspace，写回落隔离目录，零污染
+    tmp_ws = None
     if args.workspace:
         ws = Path(args.workspace)
-        ws.mkdir(parents=True, exist_ok=True)
-        for d in domain_configs:
-            target = ws / d.name
-            target.mkdir(exist_ok=True)
-            if d.name == "code-arch":
-                (target / "DOMAIN").mkdir(exist_ok=True)
-            d.instances_root = target if d.name == "purchasing" else PHASE6 / "instances"
-        print(f"  workspace: {ws}（purchasing 写回隔离目录）")
+    else:
+        tmp_ws = tempfile.mkdtemp(prefix="cross_ep_")
+        ws = Path(tmp_ws)
+    isolate_instances(domain_configs, ws)
+    print(f"  workspace（隔离，零污染）: {ws}")
 
     scenario = SCENARIOS["kafka_idempotent"]
     task = Task(description=scenario["description"], user_id="cross-ep-demo")
@@ -191,7 +207,10 @@ def main() -> None:
 
     if not args.dry_run and ep1["written_ids"]:
         print("\n[reload] 重新加载联邦图以检索 EP-1 写回...")
+        # reload 后必须重建 coordinator injector，否则仍读旧图（staleness 修复）
         fed.load()
+        coordinator.fed_injector = FederatedInjectorWrapper(fed)
+        coordinator._ensure_schema_windows()
 
     task2 = Task(description=scenario["description"], user_id="cross-ep-demo-2")
     after = inject_preview(coordinator, task2, keywords)
@@ -212,6 +231,9 @@ def main() -> None:
     print("\n" + "=" * 60)
     print(f"  EP-1 status={ep1['status']} written={ep1['written_ids']}")
     print("=" * 60)
+
+    if tmp_ws:
+        shutil.rmtree(tmp_ws, ignore_errors=True)
 
 
 if __name__ == "__main__":

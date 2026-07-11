@@ -202,11 +202,12 @@ class MemoryGateway:
             if llm_client._mode == "llm":
                 from openai import OpenAI
                 import os
+                from llm_chat import resolve_llm_base_url, resolve_llm_model
                 client = OpenAI(
                     api_key=os.environ["LLM_API_KEY"],
-                    base_url=os.environ.get("LLM_BASE_URL") or None,
+                    base_url=resolve_llm_base_url(),
                 )
-                model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+                model = resolve_llm_model()
                 resp = client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": full_prompt}],

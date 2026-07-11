@@ -21,6 +21,11 @@ from typing import Optional
 
 from memory_injector import InjectManifest
 
+DEMOCODE_ROOT = Path(__file__).resolve().parent.parent
+import sys
+sys.path.insert(0, str(DEMOCODE_ROOT))
+from llm_chat import DEFAULT_LLM_MODEL, resolve_llm_base_url, resolve_llm_model  # noqa: E402
+
 
 @dataclass
 class CodeGenResult:
@@ -64,14 +69,11 @@ SYSTEM_TEMPLATE = """\
 
 
 class LLMCoder:
-    def __init__(self, model: str = "qwen3-32b"):
+    def __init__(self, model: Optional[str] = None):
         load_env()
         self.api_key = os.environ.get("LLM_API_KEY", "")
-        self.base_url = os.environ.get(
-            "LLM_BASE_URL",
-            "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        )
-        self.model = model
+        self.base_url = resolve_llm_base_url()
+        self.model = model or resolve_llm_model()
 
     def generate(self, manifest: InjectManifest, task: str) -> CodeGenResult:
         if not self.api_key:

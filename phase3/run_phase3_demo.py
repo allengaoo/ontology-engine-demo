@@ -23,10 +23,8 @@
   python3 phase3/run_phase3_demo.py --token-only   # 仅 token 统计（不调用 LLM，离线可用）
   python3 phase3/run_phase3_demo.py --memory-stats # 打印记忆库状态
 
-环境变量（可选，不配置则使用 mock 模式）：
-  export LLM_API_KEY=sk-your-openai-api-key
-  export LLM_MODEL=gpt-4o-mini  # 默认值
-  export LLM_BASE_URL=https://api.openai.com/v1  # 默认值，支持兼容接口
+环境变量（可选，不配置则使用 mock 模式；见 democode/.env，模型默认 qwen3-32b）：
+  LLM_API_KEY / LLM_BASE_URL / LLM_MODEL
 """
 
 from __future__ import annotations
@@ -334,12 +332,13 @@ def _call_llm_no_memory(system_prompt: str, history: list, user_input: str) -> s
     
     try:
         from openai import OpenAI
-        
+        from llm_chat import resolve_llm_base_url, resolve_llm_model
+
         client = OpenAI(
             api_key=os.environ["LLM_API_KEY"],
-            base_url=os.environ.get("LLM_BASE_URL") or None,
+            base_url=resolve_llm_base_url(),
         )
-        model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+        model = resolve_llm_model()
         
         # 构建消息：system + 历史 + 当前输入
         messages = [{"role": "system", "content": system_prompt}]

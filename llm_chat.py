@@ -8,7 +8,11 @@ Phase 7 / Phase 8 的 Agent 节点统一走此模块：
 .env（democode/.env，与 phase6 llm_coder 相同）：
   LLM_API_KEY
   LLM_BASE_URL   （可选，默认 DashScope 兼容接口）
-  LLM_MODEL      （可选，默认 qwen3-32b；你本地可设为 qwen3.7-max 等）
+  LLM_MODEL      （可选；端侧默认 qwen3-32b，非 32B 模型会被自动降级）
+
+端侧小模型策略：本系列 democode 目标为 qwen3-32b（029/phase6）。
+若 .env 配置了 qwen3.7-max 等更大模型，默认强制回退到 qwen3-32b。
+设 DEMOCODE_EDGE_MODEL=0 可关闭强制（不推荐）。
 """
 
 from __future__ import annotations
@@ -16,8 +20,19 @@ from __future__ import annotations
 import json
 import os
 import re
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+DEFAULT_LLM_MODEL = "qwen3-32b"
+DEFAULT_LLM_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+# 显式允许的端侧模型（小写比较）
+ALLOWED_EDGE_MODELS = frozenset({
+    "qwen3-32b",
+    "qwen3_32b",
+    "qwen-32b",
+})
 
 _ENV_LOADED = False
 _FORCE_STUB = False
@@ -53,6 +68,46 @@ def _load_dotenv_once() -> None:
                     os.environ[key] = value
 
 
+def _edge_model_enforced() -> bool:
+    val = os.environ.get("DEMOCODE_EDGE_MODEL", "1").strip().lower()
+    return val not in ("0", "false", "no", "off")
+
+
+def resolve_llm_model(*, warn: bool = True) -> str:
+    """
+    解析实际使用的模型名。端侧 demo 默认锁定 qwen3-32b。
+
+    - 未设置 LLM_MODEL → qwen3-32b
+    - 已设置且为允许列表 / 名称含 32b → 使用该值
+    - 已设置为更大模型（如 qwen3.7-max）→ 强制 qwen3-32b 并告警
+    """
+    _load_dotenv_once()
+    configured = os.environ.get("LLM_MODEL", "").strip()
+    if not configured:
+        return DEFAULT_LLM_MODEL
+
+    normalized = configured.lower().replace("_", "-")
+    if "32b" in normalized or normalized in ALLOWED_EDGE_MODELS:
+        return configured
+
+    if _edge_model_enforced():
+        if warn:
+            msg = (
+                f"LLM_MODEL={configured!r} 非端侧 32B，"
+                f"已改用 {DEFAULT_LLM_MODEL!r}（DEMOCODE_EDGE_MODEL=0 可关闭）"
+            )
+            warnings.warn(msg, stacklevel=3)
+            print(f"  ⚠ {msg}")
+        return DEFAULT_LLM_MODEL
+
+    return configured
+
+
+def resolve_llm_base_url() -> str:
+    _load_dotenv_once()
+    return os.environ.get("LLM_BASE_URL", DEFAULT_LLM_BASE_URL)
+
+
 def is_llm_available() -> bool:
     _load_dotenv_once()
     if _FORCE_STUB:
@@ -72,11 +127,8 @@ def llm_mode_label() -> str:
     if not is_llm_available():
         key = "无 LLM_API_KEY" if not os.environ.get("LLM_API_KEY") else "openai 未安装"
         return f"stub ({key})"
-    model = os.environ.get("LLM_MODEL", "qwen3-32b")
-    base = os.environ.get(
-        "LLM_BASE_URL",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    )
+    model = resolve_llm_model()
+    base = resolve_llm_base_url()
     return f"llm ({model} @ {base})"
 
 
@@ -114,16 +166,13 @@ def chat_complete(
     from openai import OpenAI
 
     _load_dotenv_once()
-    base_url = os.environ.get(
-        "LLM_BASE_URL",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    )
+    base_url = resolve_llm_base_url()
     client = OpenAI(
         api_key=os.environ["LLM_API_KEY"],
         base_url=base_url,
         timeout=120.0,
     )
-    model = os.environ.get("LLM_MODEL", "qwen3-32b")
+    model = resolve_llm_model()
 
     kwargs: Dict[str, Any] = {
         "model": model,

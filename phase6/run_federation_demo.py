@@ -18,7 +18,11 @@ import sys
 from pathlib import Path
 
 PHASE6 = Path(__file__).parent
+DEMOCODE_ROOT = PHASE6.parent
 sys.path.insert(0, str(PHASE6))
+sys.path.insert(0, str(DEMOCODE_ROOT))
+
+from llm_chat import resolve_llm_model  # noqa: E402
 
 from llm_coder import load_env, LLMCoder  # noqa: E402
 from memory_injector import BudgetConfig  # noqa: E402
@@ -119,7 +123,7 @@ def main() -> None:
     if not api_key:
         print("  [跳过] 未设置 LLM_API_KEY")
     else:
-        model = os.environ.get("LLM_MODEL", "qwen3-32b")
+        model = resolve_llm_model()
         coder = LLMCoder(model=model)
 
         # 把联邦 context 合并进 InjectManifest（复用 LLMCoder 接口）
