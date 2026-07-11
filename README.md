@@ -332,6 +332,10 @@ python3 phase9/run_phase9_demo.py --no-llm
 
 # 真实模型验证：读取 democode/.env，模型锁定 qwen3-32b
 python3 phase9/run_phase9_demo.py
+
+# 血统一跳与队列治理
+python3 phase9/run_phase9_lineage_demo.py --no-llm
+python3 phase9/run_phase9_ops_demo.py --no-llm
 ```
 
 **Phase 9 核心能力**：
@@ -342,8 +346,11 @@ python3 phase9/run_phase9_demo.py
 | **多 EP 队列** | EP-1 PASS → promote → flush → reload → EP-2 依赖满足后执行 | `phase9/ep_queue.py` |
 | **跨 EP Manifest 差分** | EP-2 入队前快照，验证可见 EP-1 晋升的 DEC/PAT | `phase9/run_phase9_demo.py` |
 | **隔离写回** | 默认复制 instances 到临时 workspace，避免污染主记忆库 | `phase9/run_phase9_demo.py` |
+| **血统一跳** | 从 `derived_from` 扩展来源记忆，避免 DEC 孤立进入 Prompt | `phase9/lineage_expander.py` |
+| **队列治理** | reload 后 health，queue idle 时 GC dry-run | `phase9/memory_ops.py` |
 
 真实 qwen3-32b 验收：EP-2 读到 EP-1 写回后生成 3 Unit Plan，CA 逐 Unit 出码，VerifyGate 19 项 PASS；Compression 全局上限演示会裁剪 warm 节点并保护 hot/CRITICAL 约束。
+044 / 045 的离线验收分别验证 `derived_from` 一跳扩展与队列空闲治理节奏。
 
 详见 [phase9/README.md](phase9/README.md)。
 
