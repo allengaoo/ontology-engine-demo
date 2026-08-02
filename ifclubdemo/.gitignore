@@ -1,0 +1,98 @@
+# ============================================================
+# ifclubdemo .gitignore
+# 原则：只提交源码/配置/文档；运行时产物、密钥、生成物一律忽略。
+# ============================================================
+
+# ── 密钥 / 环境机密 ──────────────────────────────────────────
+# .env 含 LLM_API_KEY 等真实密钥，绝不提交；.env.example 是安全模板，保留。
+.env
+.env.local
+.env.*.local
+*.env.local
+# 但保留模板
+!.env.example
+
+# 任何疑似密钥/证书
+*.pem
+*.key
+*.p12
+*.pfx
+*secret*.json
+*credential*.json
+id_rsa
+id_rsa.pub
+*.kubeconfig
+
+# ── 运行时工作区（生成的应用、DB、记忆落盘、EP 状态）─────────────
+workspace/
+# workspace 里的 .ontology_agent 记忆、backup、scratch、sessions 全部不提交
+# workspace 里的 frontend/dist、frontend/node_modules、data/*.db 也不提交
+
+# ── 旧产物归档 / 备份 ─────────────────────────────────────────
+legacy/
+.ontology_agent/backup/
+**/.ontology_agent/backup/
+**/.ontology_agent/scratch/
+**/.ontology_agent/sessions/
+
+# ── 日志 / 基准输出 ───────────────────────────────────────────
+logs/
+*.log
+*.log.*
+.benchmarks/
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+wheels/
+*.whl
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.python-version
+
+# ── Node / 前端 ──────────────────────────────────────────────
+node_modules/
+**/node_modules/
+**/dist/
+**/build/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ── 数据库 / 持久化数据 ───────────────────────────────────────
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+data/*.db
+
+# ── 操作系统 / 编辑器 ────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.cursor/        # Cursor 本地会话/缓存（不提交）

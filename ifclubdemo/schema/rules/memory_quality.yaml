@@ -1,0 +1,20 @@
+id: memory_quality
+label: 记忆质量与淘汰规则
+type: rule
+description: 对齐 014 生命周期（骨架：声明式，030 完整实现）
+
+rules:
+  - id: hot_to_warm
+    condition: "tier == hot and access_count == 0 and days_since_access > 30"
+    action: downgrade_tier
+    target_tier: warm
+
+  - id: warm_to_cold
+    condition: "tier == warm and access_count == 0 and days_since_access > 60"
+    action: downgrade_tier
+    target_tier: cold
+
+  - id: rule_change_cascade
+    condition: "rule_id changed in schema"
+    action: deprecate_linked_memories
+    link: about_rule

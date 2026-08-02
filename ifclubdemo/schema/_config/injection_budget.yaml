@@ -1,0 +1,14 @@
+# 端侧小模型注入 token 预算（对齐 Phase 3 memory_compressor 思想）
+# 估算：1 token ≈ 2 汉字（保守）
+
+total_budget_tokens: 2000
+
+tier_budget:
+  hot: 400        # 全量注入横切约束
+  warm: 1000      # 任务相关检索结果
+  cold: 400       # 背景/历史（可选）
+  reserve: 200    # 格式与分隔符缓冲
+
+compress:
+  enabled: true
+  segment_headers: ["## HOW", "## WHEN", "## 决策", "## 背景"]

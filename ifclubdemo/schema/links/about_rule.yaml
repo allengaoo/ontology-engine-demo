@@ -1,0 +1,6 @@
+id: about_rule
+label: 记忆关联规则
+from: MemoryObject
+to: Rule
+storage_field: about_rules
+description: 规则变更时用于级联 deprecated（027）

@@ -1,0 +1,10 @@
+id: write_memory
+label: 写入记忆
+type: action
+description: 校验 ObjectType 后写入 instances/，更新图索引
+
+steps:
+  - validate_schema
+  - write_front_matter_file
+  - rebuild_index
+  - audit_log

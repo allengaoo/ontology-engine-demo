@@ -1,0 +1,17 @@
+id: DecisionRecord
+label: 决策记录
+type: object
+version: "1.0"
+extends: _memory_base
+description: 历史决策与后果，对齐 011 决策血统
+
+specific_properties:
+  context:
+    type: string
+    required: false
+  decision:
+    type: string
+    required: true
+  alternatives:
+    type: list
+    required: false
