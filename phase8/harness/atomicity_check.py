@@ -34,6 +34,12 @@ DEFAULT_ALLOWED_PREFIXES = (
     "src/purchasing/",
     "tests/purchasing/",
     "src/domain/",
+    "src/",
+    "backend/",
+    "frontend/src/",
+    "tests/",
+    "docs/",
+    "data/",
 )
 
 

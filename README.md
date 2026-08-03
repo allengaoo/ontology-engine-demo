@@ -79,10 +79,15 @@ ontology-engine-demo/
     ├── coder_agent.py           # 代码生成 + 约束校验
     └── run_multi_agent_memory_demo.py  # 演示入口
 │
+├── cli.py                       # 统一 CLI（init-app / inject / run / fix / verify）
+├── workspace_config.py
+├── cli_support/                 # scaffold / inject 辅助
+│
 └── phase8/                      # 第八阶段：Harness + BSA/CA（文章 041）
     ├── harness/
-    │   ├── ep_coordinator.py    # EP 状态机：plan → execute → verify
-    │   ├── verify_gate.py       # 三路判定 PASS / FAIL_IMPL / FAIL_STRUCT
+    │   ├── ep_coordinator.py    # EP 状态机：plan → execute → apply → verify
+    │   ├── diff_applier.py      # UnitDiff 落盘 + 备份回滚
+    │   ├── verify_gate.py       # 约束校验 + compileall + pytest
     │   ├── atomicity_check.py   # StructurePlan 原子性校验
     │   └── dag_state.py         # 断点续跑
     ├── agents/
@@ -96,6 +101,32 @@ ontology-engine-demo/
 ---
 
 ## 🚀 快速开始
+
+### ifclubdemo（推荐开发入口）
+
+端侧编码工具收敛包在 [`ifclubdemo/`](ifclubdemo/README.md)，后续开发与调试请优先在此目录进行：
+
+```bash
+cd democode/ifclubdemo
+cp .env.example .env   # 填入 LLM_API_KEY；IFCLUB_WORKSPACE 默认 ./workspace
+python3 cli.py doctor
+python3 cli.py init-app meeting_order
+python3 cli.py inject docs/business_brief.md
+python3 cli.py memory list   # 查看业务记忆落盘位置
+# 完整 step-by-step 见 ifclubdemo/README.md
+```
+
+`phase1–9` 仍保留为文章配套教学脚本；统一 CLI 的生产演进以 `ifclubdemo` 为准。
+
+### 旧版 democode/cli.py（兼容）
+
+根目录 `cli.py` 仍可用；新功能请在 `ifclubdemo/` 迭代。
+
+Phase 8 教学脚本加 `--apply` 可落盘：
+
+```bash
+python3 phase8/run_phase8_demo.py --no-llm --apply --workspace ./workspace/phase8_app
+```
 
 ### 前置要求
 

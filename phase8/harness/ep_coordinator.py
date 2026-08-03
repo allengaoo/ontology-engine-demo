@@ -37,7 +37,8 @@ from federated_graph import (  # noqa: E402
 )
 from harness.atomicity_check import AtomicityCheck, CheckOutcome  # noqa: E402
 from harness.dag_state import DagStateStore, EPCheckpoint  # noqa: E402
-from harness.verify_gate import VerifyGate, VerifyOutcome  # noqa: E402
+from harness.diff_applier import ApplyReport, DiffApplier  # noqa: E402
+from harness.verify_gate import VerifyGate, VerifyOutcome, VerifyResult  # noqa: E402
 from intent_router import IntentRouter  # noqa: E402
 from manifest_parser import enrich_task_from_manifest  # noqa: E402
 from memory_writeback import MemoryWriteback  # noqa: E402
@@ -77,6 +78,8 @@ class EPResult:
     impl_retry: int = 0
     turns: List[EPTurnRecord] = field(default_factory=list)
     writeback_id: Optional[str] = None
+    apply_report: Optional[ApplyReport] = None
+    diffs: List[UnitDiff] = field(default_factory=list)
 
     def summary(self) -> str:
         lines = [
@@ -91,6 +94,8 @@ class EPResult:
                 f"  - {t.phase.value}{label}: {t.agent_name or '-'} "
                 f"tokens≈{t.tokens} {t.outcome}{extra}"
             )
+        if self.apply_report is not None:
+            lines.append(f"  apply: {self.apply_report.summary()}")
         if self.writeback_id:
             lines.append(f"  writeback: {self.writeback_id}")
         return "\n".join(lines)
@@ -132,14 +137,32 @@ class EPCoordinator:
         domain_configs: List[DomainConfig],
         scope_registry: Optional[AgentMemoryScopeRegistry] = None,
         state_dir: Optional[Path] = None,
+        *,
+        workspace_root: Optional[Path] = None,
+        apply_enabled: bool = True,
+        run_pytest: bool = True,
+        allowed_write_globs: Optional[List[str]] = None,
+        allowed_path_prefixes: Optional[tuple] = None,
     ):
         self.fed_graph = fed_graph
         self.domain_configs = domain_configs
         self.scope_registry = scope_registry or AgentMemoryScopeRegistry(PHASE8_DEFAULT_SCOPES)
+        self.workspace_root = Path(
+            workspace_root or (DEMOCODE_ROOT / "workspace" / "app")
+        ).resolve()
+        self.apply_enabled = apply_enabled
         self.intent_router = IntentRouter()
         self.fed_injector = FederatedInjectorWrapper(fed_graph)
-        self.atomicity = AtomicityCheck()
-        self.verify_gate = VerifyGate()
+        self.atomicity = AtomicityCheck(allowed_prefixes=allowed_path_prefixes)
+        self.verify_gate = VerifyGate(
+            workspace_root=self.workspace_root,
+            run_compile=True,
+            run_pytest=run_pytest,
+        )
+        self.applier = DiffApplier(
+            self.workspace_root,
+            allowed_globs=allowed_write_globs,
+        )
         self.bsa = BusinessStructureAgent()
         self.ca = CodingAgent()
         self.bg_store = BackgroundTaskStore()
@@ -229,6 +252,9 @@ class EPCoordinator:
         route = self.intent_router.route(task.description, kws)
         task.context = task.context or {}
         task.context["route"] = {"intent": route.intent.value, "domains": route.domains}
+        task.context["_workspace_root"] = str(self.workspace_root)
+        task.context["_ep_id"] = ep_id
+        self.workspace_root.mkdir(parents=True, exist_ok=True)
         result.turns.append(EPTurnRecord(
             phase=EPPhase.ANCHOR,
             agent_name="IntentRouter",
@@ -319,8 +345,46 @@ class EPCoordinator:
                         outcome=f"diff {diff.lines}L → {diff.target_path}",
                     ))
 
-                verify = self.verify_gate.verify(all_diffs, task)
-                print(f"\n[Harness] VerifyGate: {verify.summary()}")
+                result.diffs = list(all_diffs)
+
+                # 1) 内存侧架构/约束校验
+                verify = self.verify_gate.verify(all_diffs, task, applied=False)
+                print(f"\n[Harness] VerifyGate(memory): {verify.summary()}")
+
+                # 2) 通过后落盘，再做 compile/pytest
+                if verify.outcome == VerifyOutcome.PASS and self.apply_enabled and not dry_run:
+                    apply_report = self.applier.apply(all_diffs, ep_id=ep_id, dry_run=False)
+                    result.apply_report = apply_report
+                    print(f"[Harness] DiffApplier: {apply_report.summary()}")
+                    result.turns.append(EPTurnRecord(
+                        phase=EPPhase.EXECUTE,
+                        agent_name="DiffApplier",
+                        step_label=f"apply-{impl_retry}" if impl_retry else "apply",
+                        outcome="ok" if apply_report.ok else "failed",
+                        detail=apply_report.summary(),
+                    ))
+                    if not apply_report.ok:
+                        verify = VerifyResult(
+                            outcome=VerifyOutcome.FAIL_IMPL,
+                            rule_id="APPLY-001",
+                            detail="落盘失败: " + "; ".join(
+                                f"{i.target_path}:{i.detail}" for i in apply_report.failed
+                            ),
+                            violations=[i.detail for i in apply_report.failed],
+                        )
+                    else:
+                        verify = self.verify_gate.verify(
+                            all_diffs, task, applied=True, run_pytest_stub=False
+                        )
+                        print(f"[Harness] VerifyGate(disk): {verify.summary()}")
+                        if verify.outcome != VerifyOutcome.PASS:
+                            rolled = self.applier.rollback(ep_id)
+                            print(f"  [DiffApplier] 验证失败，已回滚 {len(rolled)} 个文件")
+                elif verify.outcome == VerifyOutcome.PASS and (dry_run or not self.apply_enabled):
+                    apply_report = self.applier.apply(all_diffs, ep_id=ep_id, dry_run=True)
+                    result.apply_report = apply_report
+                    print(f"[Harness] DiffApplier(dry-run): {apply_report.summary()}")
+
                 result.turns.append(EPTurnRecord(
                     phase=EPPhase.VERIFY,
                     agent_name="VerifyGate",
@@ -344,6 +408,9 @@ class EPCoordinator:
                             "plan_id": structure_plan.plan_id,
                             "status": "pass",
                             "units": [d.unit_id for d in all_diffs],
+                            "applied": bool(
+                                result.apply_report and result.apply_report.written
+                            ),
                         },
                         dry_run=dry_run,
                     )
@@ -371,6 +438,7 @@ class EPCoordinator:
                         "rule_id": verify.rule_id,
                         "detail": verify.detail,
                         "violations": verify.violations,
+                        "command_output": getattr(verify, "command_output", "")[:1500],
                     },
                     label=f"impl-fail-{impl_retry + 1}",
                 )

@@ -98,6 +98,16 @@ def main() -> None:
     )
     parser.add_argument("--reload-roles", action="store_true", help="从 roles/*.toml 加载 scope")
     parser.add_argument("--resume", metavar="EP_ID", help="从 DagState checkpoint 续跑")
+    parser.add_argument(
+        "--workspace",
+        default=str(DEMOCODE_ROOT / "workspace" / "phase8_app"),
+        help="代码落盘目录（非 --dry-run 时生效）",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Verify 通过后落盘（默认 dry-run 不落盘；加 --apply 且去掉 --dry-run）",
+    )
     args = parser.parse_args()
     if args.no_llm:
         set_force_stub(True)
@@ -121,14 +131,22 @@ def main() -> None:
         print("\n── 从 roles/*.toml 加载 scope ──────────────")
         scope_registry = load_scopes_from_dir(PHASE8 / "roles")
 
-    coordinator = EPCoordinator(fed, domain_configs, scope_registry=scope_registry)
+    apply_enabled = bool(args.apply) and not args.dry_run
+    coordinator = EPCoordinator(
+        fed,
+        domain_configs,
+        scope_registry=scope_registry,
+        workspace_root=Path(args.workspace),
+        apply_enabled=apply_enabled,
+        run_pytest=apply_enabled,
+    )
     task = Task(description=scenario["description"], user_id="demo-001")
     task.context = dict(scenario.get("context", {}))
 
     result = coordinator.run_ep(
         task,
         keywords=scenario["keywords"],
-        dry_run=args.dry_run,
+        dry_run=args.dry_run or not apply_enabled,
         ep_id=args.resume,
         resume=bool(args.resume),
     )
