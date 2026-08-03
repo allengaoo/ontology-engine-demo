@@ -1,0 +1,6 @@
+[
+  {"name": "3F-星河", "capacity": 8, "is_active": true},
+  {"name": "3F-晨光", "capacity": 6, "is_active": true},
+  {"name": "5F-远山", "capacity": 12, "is_active": true},
+  {"name": "2F-维修中", "capacity": 4, "is_active": false}
+]

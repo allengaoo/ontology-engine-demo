@@ -1,0 +1,1 @@
+"""MySQL repository (stub)."""

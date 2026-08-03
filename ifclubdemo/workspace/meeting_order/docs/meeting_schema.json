@@ -1,0 +1,88 @@
+{
+  "name": "meeting_order",
+  "version": 1,
+  "layers": {
+    "backend": ["models", "schemas", "domain", "repositories", "services", "api"],
+    "dependency_rule": "api -> services -> (domain|repositories) -> models"
+  },
+  "models": {
+    "Room": {
+      "path": "backend/src/meeting_order/models/room.py",
+      "required_fields": {
+        "id": ["Optional[int]", "int", "Optional"],
+        "name": ["str"],
+        "capacity": ["int"],
+        "is_active": ["bool"]
+      },
+      "forbidden_fields": ["team", "slot", "active"]
+    },
+    "Booking": {
+      "path": "backend/src/meeting_order/models/booking.py",
+      "required_fields": {
+        "id": ["Optional[int]", "int", "Optional"],
+        "room_id": ["int"],
+        "title": ["str"],
+        "booker": ["str"],
+        "start_at": ["str"],
+        "end_at": ["str"]
+      },
+      "forbidden_fields": ["begin_time", "finish_time", "slot"]
+    }
+  },
+  "schemas": {
+    "CreateBookingRequest": {
+      "path": "backend/src/meeting_order/schemas/booking.py",
+      "required_fields": ["room_id", "title", "booker", "start_at", "end_at"],
+      "optional_fields": [],
+      "forbidden_fields": ["id", "slot", "begin_time"]
+    }
+  },
+  "api": {
+    "url_contract": {
+      "global_prefix_const": "API_V1_PREFIX",
+      "global_prefix_value": "/api/v1",
+      "backend_const_path": "backend/src/meeting_order/config.py",
+      "backend_mount": "main.include_router(..., prefix=API_V1_PREFIX)",
+      "router_resource_only": ["/rooms", "/bookings"],
+      "frontend_api_base": "/api/v1",
+      "frontend_call_paths": ["/rooms", "/bookings"],
+      "forbidden": [
+        "APIRouter(prefix='/api/v1/...')",
+        "apiGet('/api/v1/rooms') when apiBase already is /api/v1"
+      ]
+    },
+    "routes": {
+      "prefix": "/api/v1",
+      "rooms": "/api/v1/rooms",
+      "bookings": "/api/v1/bookings"
+    },
+    "errors": {
+      "booking_conflict": {
+        "status": 409,
+        "detail_code": "BOOKING_CONFLICT"
+      }
+    }
+  },
+  "domain_contracts": {
+    "end_after_start": true,
+    "no_overlap_same_room": true,
+    "abut_allowed": true,
+    "active_room_only": true
+  },
+  "frontend": {
+    "pages_allowlist": [
+      "frontend/src/pages/BookingPage.tsx"
+    ],
+    "components_allowlist": [
+      "frontend/src/components/ErrorBanner.tsx",
+      "frontend/src/components/BookingForm.tsx",
+      "frontend/src/components/BookingList.tsx",
+      "frontend/src/components/RoomList.tsx",
+      "frontend/src/components/RulesPanel.tsx"
+    ],
+    "forbidden_aliases": ["@/"]
+  },
+  "freeze_defaults": {
+    "after_models": ["backend/src/meeting_order/models/"]
+  }
+}

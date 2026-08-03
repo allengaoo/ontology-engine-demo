@@ -23,17 +23,18 @@ id_rsa
 id_rsa.pub
 *.kubeconfig
 
-# ── 运行时工作区（生成的应用、DB、记忆落盘、EP 状态）─────────────
-workspace/
-# workspace 里的 .ontology_agent 记忆、backup、scratch、sessions 全部不提交
-# workspace 里的 frontend/dist、frontend/node_modules、data/*.db 也不提交
+# ── 运行时工作区 ─────────────────────────────────────────────
+# 默认忽略 workspace 下所有内容，但保留 meeting_order 应用源码（作为子项目示例上库）
+workspace/*
+!workspace/meeting_order/
+# meeting_order 内的运行时产物仍忽略：.ontology_agent 记忆/状态、DB、前端构建产物
+workspace/meeting_order/.ontology_agent/
+# workspace 里的 frontend/dist、frontend/node_modules、data/*.db 由下方通用规则忽略
 
 # ── 旧产物归档 / 备份 ─────────────────────────────────────────
 legacy/
-.ontology_agent/backup/
-**/.ontology_agent/backup/
-**/.ontology_agent/scratch/
-**/.ontology_agent/sessions/
+# .ontology_agent 全部为运行时生成物（memory/arch_memory/backup/scratch/sessions/reports），不提交
+**/.ontology_agent/
 
 # ── 日志 / 基准输出 ───────────────────────────────────────────
 logs/

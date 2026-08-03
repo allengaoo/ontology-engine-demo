@@ -1,0 +1,43 @@
+# Ontology Agent workspace config
+[workspace]
+name = "meeting_order"
+app_entry = "meeting_order.main:app"
+frontend_dir = "frontend"
+frontend_dev_cmd = "npm run dev"
+frontend_build_cmd = "npm run build"
+test_cmd = "pytest -q tests/meeting_order"
+domain_memory_dir = ".ontology_agent/memory"
+arch_memory_dir = ".ontology_agent/arch_memory"
+business_brief = "docs/business_brief.md"
+architecture_brief = "docs/architecture_brief.md"
+run_pytest = true
+
+allowed_write_globs = [
+  "src/**",
+  "backend/**",
+  "frontend/src/**",
+  "frontend/public/**",
+  "frontend/package.json",
+  "frontend/vite.config.*",
+  "frontend/tsconfig*.json",
+  "frontend/index.html",
+  "tests/**",
+  "docs/**",
+  "data/**",
+  "acceptance/**",
+  "requirements.txt",
+  "README.md",
+  "workspace.toml",
+  "*.md",
+]
+
+allowed_path_prefixes = [
+  "backend/",
+  "frontend/src/",
+  "frontend/public/",
+  "frontend/index.html",
+  "tests/",
+  "docs/",
+  "data/",
+  "acceptance/",
+]
