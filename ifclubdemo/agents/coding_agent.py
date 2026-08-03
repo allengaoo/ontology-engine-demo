@@ -27,13 +27,12 @@ from core.task import AgentResult, Task
 _CA_SYSTEM = """你是 CodingAgent（CA），只为单个 Unit 生成完整源码（不是 diff）。
 硬性要求（小模型友好）：
 1) 只输出纯代码，不要 markdown 围栏，不要解释
-2) import 包名必须与目标路径一致：meeting_order 目标只用 from meeting_order...；oncall 目标只用 from oncall...
+2) import 包名必须与目标路径一致：meeting_order 目标只用 from meeting_order...
 3) 写码前自检：每个 from/import 的模块与符号必须出现在「上游签名 / 依赖文件 / 磁盘现有内容」中；
-   不存在就不要 invent（禁止 BaseRoomRepository、repositories.booking、oncall 等臆造）
+   不存在就不要 invent（禁止 BaseRoomRepository、repositories.booking 等臆造）
 4) 命名：文件/模块 snake_case；类 PascalCase；函数/变量 snake_case；会议域仓储只用 MeetingRepository + SqliteRepository
 5) 长度：单文件尽量 ≤220 行；只做本 Unit 描述的一件事
-6) 字段写死：Room(id,name,capacity,is_active)；Booking(id,room_id,title,booker,start_at,end_at)；
-   Roster 仅 shifts（oncall）
+6) 字段写死：Room(id,name,capacity,is_active)；Booking(id,room_id,title,booker,start_at,end_at)
 7) 若提供「磁盘/scratch 现有内容」，在其上修改，不要无关重写；禁止改未点名的其他文件内容
 8) domain 规矩纯函数禁访问 db；编排经 services；存取经 factory.get_repository/init_db
 9) 兼容 Python 3.9；CreateBookingRequest 不要当错误的 response_model
@@ -117,15 +116,11 @@ class CodingAgent:
                 f"会议域禁止写入 {path}；必须写到 "
                 "backend/src/meeting_order/repositories/"
             )
-        if "oncall" in path:
-            return f"会议域禁止写入 oncall 路径: {path}"
         # 禁符号/命名/长度/导入检查只对代码文件生效；.md 文档里提到
         # BaseRepository（如写"禁止用 BaseRepository"经验）是合法散文，不能误判。
         is_code = path.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"))
         if not is_code:
             return None
-        if re.search(r"\bimport\s+oncall\b|\bfrom\s+oncall\b", code):
-            return f"{path}: 禁止 import oncall"
         for bad in (
             "BaseRoomRepository",
             "BaseBookingRepository",
@@ -269,27 +264,16 @@ class CodingAgent:
             )
         ):
             return ""
-        app = "meeting_order" if "meeting_order" in rel else "oncall"
-        if app == "meeting_order":
-            deps = [
-                "backend/src/meeting_order/models/room.py",
-                "backend/src/meeting_order/models/booking.py",
-                "backend/src/meeting_order/schemas/booking.py",
-                "backend/src/meeting_order/domain/rules.py",
-                "backend/src/meeting_order/repositories/base.py",
-                "backend/src/meeting_order/repositories/factory.py",
-                "backend/src/meeting_order/repositories/sqlite_repo.py",
-                "backend/src/meeting_order/config.py",
-            ]
-        else:
-            deps = [
-                "backend/src/oncall/models/engineer.py",
-                "backend/src/oncall/models/shift.py",
-                "backend/src/oncall/models/roster.py",
-                "backend/src/oncall/schemas/engineer.py",
-                "backend/src/oncall/domain/rules.py",
-                "backend/src/oncall/repositories/base.py",
-            ]
+        deps = [
+            "backend/src/meeting_order/models/room.py",
+            "backend/src/meeting_order/models/booking.py",
+            "backend/src/meeting_order/schemas/booking.py",
+            "backend/src/meeting_order/domain/rules.py",
+            "backend/src/meeting_order/repositories/base.py",
+            "backend/src/meeting_order/repositories/factory.py",
+            "backend/src/meeting_order/repositories/sqlite_repo.py",
+            "backend/src/meeting_order/config.py",
+        ]
         chunks: List[str] = []
         for dep in deps:
             if dep == rel:

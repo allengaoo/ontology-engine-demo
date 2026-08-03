@@ -16,11 +16,11 @@ enforcement: reject
 
 ## HOW
 
-应用分层（目录固定在 `backend/src/oncall/`）：
+应用分层（目录固定在 `backend/src/meeting_order/`）：
 API（路由）→ schemas（DTO）→ Service（编排）→（domain 纯规则 | repositories 数据访问）→ models。
 
 硬约束：
-- API 不得写 SQL，不得写排班规则
+- API 不得写 SQL，不得写预订规则
 - Service 不得依赖 FastAPI Request/Response
 - domain 不得访问 DB / 读文件
 - 业务代码通过 `repositories.factory.get_repository()` 取仓储，禁止在 api/services 直接 `sqlite3.connect`

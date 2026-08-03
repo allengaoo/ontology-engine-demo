@@ -25,7 +25,7 @@ PHASE8_DEFAULT_SCOPES: Dict[str, AgentMemoryScope] = {
         read_layers=["critical", "rule", "context"],
         write_layers=[],
         budget_multiplier=1.0,
-        concept_hints=["architecture", "oncall", "pattern", "layering"],
+        concept_hints=["architecture", "meeting_order", "pattern", "layering"],
     ),
     "CodingAgent": AgentMemoryScope(
         agent_name="CodingAgent",
@@ -34,7 +34,7 @@ PHASE8_DEFAULT_SCOPES: Dict[str, AgentMemoryScope] = {
         read_layers=["critical", "rule", "pattern"],
         write_layers=[],
         budget_multiplier=0.8,
-        concept_hints=["architecture", "oncall", "fastapi", "react"],
+        concept_hints=["architecture", "meeting_order", "fastapi", "react"],
     ),
 }
 

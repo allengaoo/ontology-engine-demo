@@ -1,7 +1,7 @@
 """
-schema_gate — oncall 领域 Object 硬校验（零 LLM）
+schema_gate — meeting_order 领域 Object 硬校验（零 LLM）
 
-对照 docs/oncall_schema.json（或 workspace 副本）：
+对照 docs/meeting_schema.json（或 workspace 副本）：
   - required_fields 必须出现在 dataclass / 类体中
   - forbidden_fields 不得作为属性名出现
 失败 → VerifyOutcome.FAIL_STRUCT（逼 BSA 按契约重规划）
@@ -43,10 +43,7 @@ def resolve_schema_path(workspace_root: Path) -> Optional[Path]:
     candidates = [
         root / "docs" / "meeting_schema.json",
         root / ".ontology_agent" / "meeting_schema.json",
-        root / "docs" / "oncall_schema.json",
-        root / ".ontology_agent" / "oncall_schema.json",
         Path(__file__).resolve().parents[1] / "docs" / "meeting_schema.json",
-        Path(__file__).resolve().parents[1] / "docs" / "oncall_schema.json",
     ]
     for c in candidates:
         if c.exists():
@@ -95,7 +92,7 @@ def _field_mentioned(source: str, field: str) -> bool:
 
 
 class SchemaGate:
-    """对照 oncall_schema.json 检查 models（及 diffs 中的同名文件）。"""
+    """对照 meeting_schema.json 检查 models（及 diffs 中的同名文件）。"""
 
     def check(
         self,
@@ -167,16 +164,7 @@ class SchemaGate:
                         )
                     )
 
-            # Roster 特例：构造/调用侧禁止 engineers=
-            if model_name == "Roster" and re.search(
-                r"Roster\s*\([^)]*\bengineers\s*=", source
-            ):
-                result.ok = False
-                result.violations.append(
-                    SchemaViolation(model_name, "禁止 Roster(engineers=...)，应使用 shifts")
-                )
-
-        # DTO / schemas 段（CreateEngineerRequest 等）
+        # DTO / schemas 段（CreateBookingRequest 等）
         schema_dtos: Dict[str, dict] = schema.get("schemas") or {}
         for dto_name, spec in schema_dtos.items():
             rel = (spec.get("path") or "").replace("\\", "/").lstrip("./")

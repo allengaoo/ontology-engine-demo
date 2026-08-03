@@ -91,6 +91,7 @@ def _render_memory(
     enforcement: str,
     body: str,
     source_file: str,
+    app_tag: str = "meeting_order",
 ) -> str:
     enf = f"\nenforcement: {enforcement}" if enforcement else ""
     rule = f"\nrule_id: {memory_id}" if object_type == "ConstraintMemory" else ""
@@ -101,7 +102,7 @@ title: {_yaml_str(title)}
 layer: {layer}
 tier: hot
 tags:
-- oncall
+- {app_tag}
 - injected
 confidence: 0.9
 schema_version: 1
@@ -115,7 +116,7 @@ source: {source_file}
 
 ## WHEN
 
-由业务说明 inject 生成；实现排班/校验相关代码时必查。
+由业务说明 inject 生成；实现会议室预订/校验相关代码时必查。
 """
 
 
@@ -132,10 +133,10 @@ def inject_business_brief(
     report = InjectReport(source=str(brief_path), dry_run=dry_run)
 
     counters = {"CN": 0, "PAT": 0, "ANTI": 0}
-    # 按工作区名生成前缀，避免 meeting_order 注入出 CN-ONCALL-* 误导小模型
+    # 按工作区名生成前缀，避免注入出与工作区不符的 memory id 误导小模型
     app_slug = "APP"
     for part in memory_dir.resolve().parts:
-        if part in {"meeting_order", "oncall"}:
+        if part == "meeting_order":
             app_slug = part.upper().replace("-", "_")
             break
     else:
@@ -163,6 +164,7 @@ def inject_business_brief(
                 enforcement=enforcement,
                 body=bullet,
                 source_file=brief_path.name,
+                app_tag=app_slug.lower(),
             )
             report.items.append(
                 InjectItem(

@@ -614,8 +614,8 @@ class VerifyGate:
         if test_paths:
             cmd.extend(list(test_paths))
         else:
-            # 若存在 tests/oncall 或 tests/purchasing 优先；否则 tests
-            for candidate in ("tests/oncall", "tests/purchasing", "tests"):
+            # 若存在 tests/meeting_order 优先；否则 tests
+            for candidate in ("tests/meeting_order", "tests"):
                 if (root / candidate).exists():
                     cmd.append(candidate)
                     break

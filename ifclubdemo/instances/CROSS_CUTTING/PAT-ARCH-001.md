@@ -6,7 +6,7 @@ layer: CROSS_CUTTING
 tier: hot
 tags:
 - architecture
-- oncall
+- meeting_order
 - stack
 confidence: 0.9
 schema_version: 1
@@ -16,15 +16,15 @@ status: active
 ## HOW
 
 推荐目录：
-- `backend/src/oncall/`：api / schemas / services / domain / repositories / models
-- `tests/oncall/`：pytest（固定 sqlite）
-- `frontend/`：Vite + React + TypeScript；组件/页面白名单见 oncall_schema.json
+- `backend/src/meeting_order/`：api / schemas / services / domain / repositories / models
+- `tests/meeting_order/`：pytest（固定 sqlite）
+- `frontend/`：Vite + React + TypeScript；组件/页面白名单见 meeting_schema.json
 - `docs/business_brief.md`：业务初始记忆源
 - `docs/architecture_brief.md`：架构初始记忆源
 - `.ontology_agent/memory/`：业务域记忆
 - `.ontology_agent/arch_memory/`：架构记忆
 
-数据库：默认 `ONCALL_DB_BACKEND=sqlite`；可切换 `mysql`（同 Repository 接口）。
+数据库：默认 `MEETING_DB_BACKEND=sqlite`；可切换 `mysql`（同 Repository 接口）。
 
 ## WHEN
 

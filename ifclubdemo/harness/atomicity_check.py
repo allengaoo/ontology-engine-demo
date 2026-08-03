@@ -47,8 +47,7 @@ DEFAULT_ALLOWED_PREFIXES = (
 FORBIDDEN_EXACT = frozenset(
     {
         "backend/src/main.py",
-        "backend/src/oncall/models.py",  # 与 models/ 包冲突
-        "backend/src/oncall/scheduler.py",  # 应在 domain/scheduler.py
+        "backend/src/meeting_order/models.py",  # 与 models/ 包冲突
     }
 )
 
@@ -59,10 +58,8 @@ FORBIDDEN_SUBSTRINGS = (
     "/forbidden/",
 )
 
-# 当工作区是会议应用时，禁止误写到 oncall 或丢掉包名的路径
+# 当工作区是会议应用时，禁止丢掉包名的路径
 MEETING_FORBIDDEN_SUBSTRINGS = (
-    "backend/src/oncall/",
-    "tests/oncall/",
     "backend/src/repositories/",  # 必须是 backend/src/meeting_order/repositories/
     "backend/src/models/",
     "backend/src/services/",

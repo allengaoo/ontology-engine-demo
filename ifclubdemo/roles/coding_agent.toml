@@ -9,4 +9,4 @@ write_layers      = []
 budget_multiplier = 0.8
 
 [concept_hints]
-keywords = ["architecture", "oncall", "fastapi", "react"]
+keywords = ["architecture", "meeting_order", "fastapi", "react"]

@@ -57,14 +57,14 @@ class MemoryEPWriteback:
             "title": f"EP 成功：{payload.get('plan_id', ep_id)}",
             "layer": "DOMAIN",
             "tier": "warm",
-            "tags": ["ep-success", "oncall", "shared-memory", "ep-writeback"],
+            "tags": ["ep-success", "meeting_order", "shared-memory", "ep-writeback"],
             "confidence": 0.92,
             "schema_version": 2,
             "decision": (
-                f"action={payload.get('action', 'implement_oncall')} "
+                f"action={payload.get('action', 'implement_meeting_order')} "
                 f"units={payload.get('units', [])}"
             )[:500],
-            "about_concepts": ["oncall", "roster", "ep-writeback"],
+            "about_concepts": ["meeting_order", "booking", "ep-writeback"],
             "derived_from": derived[:10],
             "status": "active",
             "domain": domain,
@@ -106,10 +106,10 @@ class MemoryEPWriteback:
             "title": f"StructurePlan 模板：{payload.get('action', '')}",
             "layer": "DOMAIN",
             "tier": "warm",
-            "tags": ["structure-plan", "ep-template", "oncall"],
+            "tags": ["structure-plan", "ep-template", "meeting_order"],
             "confidence": 0.85,
             "schema_version": 2,
-            "about_concepts": ["oncall", "structure-plan", "roster"],
+            "about_concepts": ["meeting_order", "structure-plan", "booking"],
             "derived_from": derived[:10],
             "status": "active",
             "domain": "domain",
@@ -117,11 +117,11 @@ class MemoryEPWriteback:
         paths = payload.get("unit_paths", [])
         body = (
             f"## HOW\n\n"
-            f"同类 oncall 任务可参考本 EP 的 Unit 切分：\n"
+            f"同类 meeting_order 任务可参考本 EP 的 Unit 切分：\n"
             + "\n".join(f"- {p}" for p in paths)
             + f"\n\n共 {payload.get('unit_count', 0)} 个 Unit，action={payload.get('action')}。\n\n"
             f"## WHEN\n\n"
-            f"同类排班 / 冲突检测任务；EP 锚定后 inject 可检索本模板。\n\n"
+            f"同类会议室预订 / 冲突检测任务；EP 锚定后 inject 可检索本模板。\n\n"
             f"## 来源\n\n"
             f"task: {task_description[:200]}\n"
         )
@@ -176,29 +176,20 @@ class MemoryEPWriteback:
                 uniq.append(x)
         tip = uniq[0][:160] if uniq else (detail or rule_id)[:160]
         blob = "\n".join(uniq + [task_description, detail, cmd])
-        meeting = "meeting_order" in blob or "meeting_order" in tip
         files = re.findall(
-            r"(backend/src/(?:meeting_order|oncall)/[^\s:]+|tests/(?:meeting_order|oncall)/[^\s:]+|frontend/src/[^\s:]+)",
+            r"(backend/src/meeting_order/[^\s:]+|tests/meeting_order/[^\s:]+|frontend/src/[^\s:]+)",
             blob,
         )
         file_hint = (
             ", ".join(list(dict.fromkeys(files))[:4]) if files else "（未解析到文件）"
         )
-        if meeting:
-            fix = (
-                "只改 meeting_order 包；import 只用 from meeting_order...；"
-                "对齐 repositories.base.MeetingRepository + factory.get_repository/init_db；"
-                "禁止 oncall / invent repositories.booking"
-            )
-        else:
-            fix = "读上游签名后只改未 freeze 文件；Roster 用 shifts；对齐 oncall_schema.json"
-        if "No module named 'oncall'" in blob or "from oncall" in blob:
-            fix = (
-                "禁止任何 oncall 导入；改为 meeting_order.config / "
-                "meeting_order.repositories.factory；先扫全包 import 再改"
-            )
-        elif "IMPORT-CROSS-APP" in rule_id or "IMPORT-CROSS-APP" in blob:
-            fix = "生成代码不得出现 import/from oncall；包名必须与目标路径一致"
+        fix = (
+            "只改 meeting_order 包；import 只用 from meeting_order...；"
+            "对齐 repositories.base.MeetingRepository + factory.get_repository/init_db；"
+            "禁止 invent repositories.booking"
+        )
+        if "IMPORT-CROSS-APP" in rule_id or "IMPORT-CROSS-APP" in blob:
+            fix = "生成代码不得跨包互引；包名必须与目标路径一致（meeting_order）"
         elif "BaseRepository" in blob or "BaseBookingRepository" in blob:
             fix = "使用 MeetingRepository（repositories/base.py）；禁止 BaseRepository 旧名"
         elif "repositories.booking" in blob or "repositories.room" in blob:
@@ -209,8 +200,6 @@ class MemoryEPWriteback:
             fix = "去掉 @/，改用相对 import；保证 vite build"
         elif "response_model" in tip or "Pydantic" in tip or "FastAPIError" in tip:
             fix = "修正 FastAPI 返回类型/response_model；请求体用 CreateBookingRequest"
-        elif "engineers" in tip and "Roster" in tip:
-            fix = "禁止 Roster(engineers=)；使用 Roster(shifts=...)"
         elif "JSONDecodeError" in blob or "seed_rooms" in blob:
             fix = "data/seed_rooms.json 必须是合法 JSON 数组；用 config.ROOT / data/seed_rooms.json"
         elif "takes 1 positional argument but 2" in blob and "SqliteRepository" in blob:
@@ -222,7 +211,7 @@ class MemoryEPWriteback:
             "file_hint": file_hint,
             "fix_path": fix,
             "signals": "\n".join(f"- {x}" for x in uniq[:12]) or f"- {detail}",
-            "app": "meeting_order" if meeting else "oncall",
+            "app": "meeting_order",
         }
 
     def _write_anti(
@@ -245,12 +234,8 @@ class MemoryEPWriteback:
         violations = payload.get("violations") or []
         cmd = (payload.get("command_output") or "")[:2000]
         digest = self._anti_digest(rule_id, detail, violations, cmd, task_description)
-        app = digest.get("app") or "oncall"
-        concepts = (
-            ["meeting_order", "booking", "ep-fail"]
-            if app == "meeting_order"
-            else ["oncall", "roster", "ep-fail"]
-        )
+        app = digest.get("app") or "meeting_order"
+        concepts = ["meeting_order", "booking", "ep-fail"]
 
         meta = {
             "id": node_id,
@@ -278,11 +263,7 @@ class MemoryEPWriteback:
             "gc_protect": True,
             "gc_note": "FAIL→ANTI hot；age_idle_decay 跳过 gc-protect",
         }
-        when = (
-            "同类 meeting_order 预订任务；下一轮 Repair 必须先避开本条再改代码。"
-            if app == "meeting_order"
-            else "同类 oncall 任务；Repair EP 必须先说明如何避开再改代码。"
-        )
+        when = "同类 meeting_order 预订任务；下一轮 Repair 必须先避开本条再改代码。"
         body = (
             f"## HOW\n\n"
             f"可执行避坑：\n"

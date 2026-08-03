@@ -4,7 +4,7 @@
 
 不是「单 Agent 一把梭写完」，也不是「本体概念讲义」。核心目标是：在本体约束与确定性门禁下，让小模型稳定产出可运行的全栈业务软件。
 
-当前主线示例为 **会议室预订系统（meeting_order）**：Python(FastAPI) 后端 + React 前端 + 领域规则（SQLite），全程由 `qwen3-coder-30b-a3b-instruct`（<50B 档）经 CLI/EP 生成。早期演示样例 **研发值班排班（oncall）** 仍作为脚手架可选应用保留（`cli_support/scaffold_oncall.py`）。
+主线示例为 **会议室预订系统（meeting_order）**：Python(FastAPI) 后端 + React 前端 + 领域规则（SQLite），全程由 `qwen3-coder-30b-a3b-instruct`（<50B 档）经 CLI/EP 生成。
 
 默认模型：云端 `qwen3-coder-30b-a3b-instruct`（<50B 档，云端模拟端侧）。
 
@@ -38,7 +38,7 @@ ifclubdemo/
 │   ├── plan_refine.py             # freeze 剪枝 + Unit 预算（≤N 文件）
 │   ├── diff_applier.py            # 落盘 / 备份 / 回滚 / scratch
 │   ├── verify_gate.py             # CodeValidator + Schema + compile + pytest/vite
-│   ├── schema_gate.py             # oncall_schema.json 硬校验
+│   ├── schema_gate.py             # meeting_schema.json 硬校验
 │   ├── freeze_state.py            # models 等稳定点冻结
 │   ├── ep_promotion.py            # PASS→DEC/PAT；FAIL→ANTI
 │   └── session_flush.py           # 会话归档（不进共享本体）
@@ -48,10 +48,10 @@ ifclubdemo/
 ├── docs/
 │   ├── business_brief.md 模板源    # → scaffold → inject → domain 记忆
 │   ├── architecture_brief.md      # → inject-arch → code-arch 记忆
-│   └── oncall_schema.json         # 领域 Object硬 Schema
+│   └── meeting_schema.json         # 领域 Object硬 Schema
 ├── instances/                     # 未 inject-arch 时的架构种子
 ├── schema/objects/*.yaml          # 记忆 ObjectType（Constraint/Pattern/Anti/Decision）
-└── scripts/run_twosession_rebuild.py  # 2×10 微步骤重建实验
+└── scripts/run_meeting_60r_30b.py  # 2×30 轮白话构建实验
 ```
 
 
@@ -64,7 +64,7 @@ flowchart TB
     T[Task / 微步骤 rounds]
     B[business_brief]
     A[architecture_brief]
-    S[oncall_schema.json]
+    S[meeting_schema.json]
   end
 
   subgraph Memory["记忆 / 动态本体"]
@@ -87,7 +87,7 @@ flowchart TB
   end
 
   subgraph Out["产物与写回"]
-    WS[workspace/oncall 代码]
+    WS[workspace/meeting_order 代码]
     DEC[DEC / BIZ-PAT]
     ANTI[ANTI-EP 热记忆]
     FZ[freeze.json]
@@ -127,25 +127,24 @@ flowchart TB
 
 
 
-### 3) 目标产物分层（oncall：Agent 要生成的业务软件）
+### 3) 目标产物分层（meeting_order：Agent 要生成的业务软件）
 
 主线产出不是文档或演示稿，而是一套可运行的业务软件骨架：
 
 ```text
-workspace/oncall/
-├── docs/oncall_schema.json          # 硬契约（与工具 SchemaGate 共用）
-├── backend/src/oncall/
-│   ├── models/                      # Engineer / Shift / Roster（可 freeze）
-│   ├── schemas/                     # DTO：CreateEngineerRequest 等
+workspace/meeting_order/
+├── docs/meeting_schema.json        # 硬契约（与工具 SchemaGate 共用）
+├── backend/src/meeting_order/
+│   ├── models/                      # Room / Booking（可 freeze）
+│   ├── schemas/                     # DTO：CreateBookingRequest 等
 │   ├── domain/rules.py              # 纯函数校验（无 I/O）
-│   ├── domain/scheduler.py          # generate_week → Roster(shifts=…)
 │   ├── repositories/                # 仓储抽象；sqlite / mysql 可切换
 │   ├── services/                    # 服务层编排 domain + repositories
 │   ├── api/*.py                     # 路由层：HTTP ↔ DTO ↔ Service
-│   ├── config.py                    # ONCALL_DB_BACKEND 等
+│   ├── config.py                    # MEETING_DB_BACKEND 等
 │   └── main.py                      # lifespan → init_db；挂载 /api/v1
 ├── frontend/src/                    # React；页面/组件白名单；禁止 @/
-└── tests/oncall/                    # conftest monkeypatch DB → sqlite tmp
+└── tests/meeting_order/             # conftest monkeypatch DB → sqlite tmp
 ```
 
 约定：
@@ -164,7 +163,7 @@ workspace/oncall/
 ```text
 业务记忆 domain     ← business_brief（业务对象、规则、反模式）
 架构记忆 code-arch  ← architecture_brief（分层、写范围、门禁、freeze）
-硬 Schema           ← oncall_schema.json（字段白/黑名单，机器校验）
+硬 Schema           ← meeting_schema.json（字段白/黑名单，机器校验）
 运行时写回          ← DEC/PAT（成功）+ ANTI-EP（失败，gc-protect）
 会话归档            ← .ontology_agent/sessions/<id>/（不进共享本体）
 ```
@@ -196,10 +195,10 @@ cp .env.example .env
 | `LLM_BASE_URL`     | API 地址      | DashScope 兼容接口                 |
 | `LLM_MODEL`        | 模型名         | `qwen3-coder-30b-a3b-instruct` |
 | `IFCLUB_WORKSPACE` | 工作区根目录      | `./workspace`                  |
-| `IFCLUB_APP`       | 默认应用名       | `oncall`                       |
+| `IFCLUB_APP`       | 默认应用名       | `meeting_order`                |
 
 
-默认应用路径：`democode/ifclubdemo/workspace/oncall`。
+默认应用路径：`democode/ifclubdemo/workspace/meeting_order`。
 
 ```bash
 # 2) 依赖（可选）
@@ -219,16 +218,13 @@ bash scripts/demo_doctor.sh
 
 ## 1. Step-by-step：从业务记忆到测试通过
 
-以下以 **研发值班排班系统（oncall）** 为例。  
+以下以 **会议室预订系统（meeting_order）** 为例。  
 除非注明，命令均在 `democode/ifclubdemo` 目录执行；`--workspace` 可省略（读 `.env`）。
 
 ### Step 1 — 构建脚手架（含业务 / 架构说明模板）
 
 ```bash
-# 当前主线：会议室预订系统
 python3 cli.py init-app meeting_order
-# 早期演示：研发值班排班（可选）
-# python3 cli.py init-app oncall
 ```
 
 生成：
@@ -265,14 +261,14 @@ workspace/meeting_order/
 编辑：
 
 ```bash
-$EDITOR workspace/oncall/docs/business_brief.md
+$EDITOR workspace/meeting_order/docs/business_brief.md
 ```
 
 重点维护这些章节（会被 `inject` 解析）：
 
-- **硬约束**：一人同日不可双班、最大连续值班天数等  
-- **推荐模式**：周循环、冲突返回明确错误码、前端展示后端错误（不重算规则）  
-- **反模式**：排班规则写在 API 层、忽略冲突继续保存、硬约束只写在前端等
+- **硬约束**：同房间同一时间段不可重叠预订、房间容量与生效状态等  
+- **推荐模式**：冲突返回明确错误码（409）、前端展示后端错误（不重算规则）  
+- **反模式**：预订规则写在 API 层、忽略冲突继续保存、硬约束只写在前端等
 
 工程约定（API 前缀、Vite proxy、前端不直连 SQLite、写范围含 `backend/`）放在  
 `docs/architecture_brief.md`，用 `inject-arch`，不要写进业务说明。
@@ -300,24 +296,18 @@ python3 cli.py inject docs/business_brief.md
 **业务记忆落盘位置（容易漏看）：**
 
 ```text
-workspace/oncall/.ontology_agent/memory/
-├── CROSS_CUTTING/CN-ONCALL-*.md   # ConstraintMemory
-├── DOMAIN/PAT-ONCALL-*.md         # PatternMemory
-└── DOMAIN/ANTI-ONCALL-*.md        # AntiPatternMemory
+workspace/meeting_order/.ontology_agent/memory/
+├── CROSS_CUTTING/CN-MEETING_ORDER-*.md   # ConstraintMemory
+├── DOMAIN/PAT-MEETING_ORDER-*.md         # PatternMemory
+└── DOMAIN/ANTI-MEETING_ORDER-*.md        # AntiPatternMemory
 
-workspace/oncall/.ontology_agent/inject_report.json   # 审计报告
+workspace/meeting_order/.ontology_agent/inject_report.json   # 审计报告
 ```
 
 列出业务记忆 + 架构记忆：
 
 ```bash
 python3 cli.py memory list
-```
-
-或：
-
-```bash
-bash scripts/demo_inject_memory.sh
 ```
 
 ---
@@ -329,10 +319,10 @@ bash scripts/demo_inject_memory.sh
 编辑架构说明（可选，脚手架已带模板）：
 
 ```bash
-$EDITOR workspace/oncall/docs/architecture_brief.md
+$EDITOR workspace/meeting_order/docs/architecture_brief.md
 ```
 
-典型内容：**分层**、API 前缀 / Vite proxy、前端不直连库、**写路径可回滚**、**写范围**（oncall 含 `backend/`）。
+典型内容：**分层**、API 前缀 / Vite proxy、前端不直连库、**写路径可回滚**、**写范围**（含 `backend/`）。
 
 写入工作区 `arch_memory`（有则优先于包内种子）：
 
@@ -345,11 +335,11 @@ python3 cli.py memory list
 落盘位置：
 
 ```text
-workspace/oncall/.ontology_agent/arch_memory/
+workspace/meeting_order/.ontology_agent/arch_memory/
 ├── CROSS_CUTTING/CN-ARCH-WS-*.md
 └── DOMAIN/ANTI-ARCH-WS-*.md
 
-workspace/oncall/.ontology_agent/inject_arch_report.json
+workspace/meeting_order/.ontology_agent/inject_arch_report.json
 ```
 
 未执行 `inject-arch` 时，EP 使用包内精简种子 `ifclubdemo/instances/`。
@@ -374,7 +364,7 @@ python3 cli.py run --task-file acceptance/checklist.md
 或自然语言：
 
 ```bash
-python3 cli.py run --task "实现 domain/rules 冲突检测：同一工程师同日不可双班，并补 API 与单测"
+python3 cli.py run --task "实现 domain/rules 冲突检测：同房间同一时间段不可重叠预订，并补 API 与单测"
 ```
 
 离线看 Harness 流程（stub，不调模型）：
@@ -389,7 +379,7 @@ python3 cli.py run --task "修复 Kafka 幂等" --no-llm --no-apply
 
 1. BSA 出多模块 `StructurePlan`
 2. CA 按 Unit 生成代码
-3. `DiffApplier` 写入 `workspace/oncall/...`
+3. `DiffApplier` 写入 `workspace/meeting_order/...`
 4. `VerifyGate` 跑约束 + `compileall` + `pytest`
 5. 通过则写回 DecisionRecord（记忆晋升）
 
@@ -408,8 +398,8 @@ python3 cli.py verify
 仅测后端也可：
 
 ```bash
-cd workspace/oncall
-PYTHONPATH=backend/src pytest -q tests/oncall
+cd workspace/meeting_order
+PYTHONPATH=backend/src pytest -q tests/meeting_order
 ```
 
 ---
@@ -426,8 +416,8 @@ python3 cli.py fix --from-verify
 
 # 或明确描述 + 限定文件（推荐）
 python3 cli.py fix \
-  --task "修复：同一工程师同日双班未被拒绝，应返回 409" \
-  --files backend/src/oncall/domain/rules.py,tests/oncall/test_rules.py
+  --task "修复：同房间同一时间段重叠预订未被拒绝，应返回 409" \
+  --files backend/src/meeting_order/domain/rules.py,tests/meeting_order/test_rules.py
 ```
 
 再验证：
@@ -457,15 +447,15 @@ python3 cli.py verify
 正确顺序：**先改记忆，再改代码**。
 
 ```bash
-# 1) 改业务说明（例如：最大连续值班改为 2 天）
-$EDITOR workspace/oncall/docs/business_brief.md
+# 1) 改业务说明（例如：预订最小时长调整为 30 分钟）
+$EDITOR workspace/meeting_order/docs/business_brief.md
 
 # 2) 重新注入业务记忆
 python3 cli.py inject docs/business_brief.md
 python3 cli.py memory list
 
 # 3) 让 Agent 按新约束改实现与测试
-python3 cli.py fix --task "按最新 ConstraintMemory 调整最大连续值班天数，并更新单测"
+python3 cli.py fix --task "按最新 ConstraintMemory 调整预订时长约束，并更新单测"
 
 # 4) 回归
 python3 cli.py verify
@@ -478,12 +468,12 @@ python3 cli.py verify
 ### Step 9 — 生成 / 补强测试用例
 
 ```bash
-python3 cli.py run --task "为 domain/rules 与 scheduler 补充 pytest：覆盖双班冲突、非 active 工程师、一周排班生成"
+python3 cli.py run --task "为 domain/rules 补充 pytest：覆盖同房间时间冲突、跨房间不冲突、房间容量校验"
 
 # 或定点
 python3 cli.py fix \
-  --task "补充 test_rules 中双班冲突用例" \
-  --files tests/oncall/test_rules.py
+  --task "补充 test_rules 中同房间时间冲突用例" \
+  --files tests/meeting_order/test_rules.py
 ```
 
 然后：
@@ -500,11 +490,11 @@ python3 cli.py verify
 
 ```bash
 # 后端
-cd workspace/oncall/backend
-PYTHONPATH=src uvicorn oncall.main:app --reload --port 8000
+cd workspace/meeting_order/backend
+PYTHONPATH=src uvicorn meeting_order.main:app --reload --port 8000
 
 # 前端（另开终端）
-cd workspace/oncall/frontend
+cd workspace/meeting_order/frontend
 npm install
 npm run dev
 ```
@@ -522,7 +512,7 @@ npm run dev
 | ------------------------ | ----------------------------------------------------- |
 | `doctor`                 | 检查 `.env`、LLM、工作区、依赖                                  |
 | `init`                   | 初始化通用 workspace                                       |
-| `init-app [oncall]`      | 生成 FastAPI+React 脚手架 + 业务/架构说明模板                      |
+| `init-app [meeting_order]` | 生成 FastAPI+React 脚手架 + 业务/架构说明模板                      |
 | `inject <brief.md>`      | 业务说明 → `.ontology_agent/memory/`（支持 `--dry-run`）      |
 | `inject-arch <brief.md>` | 架构说明 → `.ontology_agent/arch_memory/`（支持 `--dry-run`） |
 | `memory list`            | 列出业务记忆 + 架构记忆（工作区优先）                                  |
@@ -547,7 +537,6 @@ npm run dev
 | 脚本                                 | 内容                             |
 | ---------------------------------- | ------------------------------ |
 | `scripts/demo_doctor.sh`           | 环境自检                           |
-| `scripts/demo_inject_memory.sh`    | 脚手架 + inject + memory list     |
 | `scripts/demo_harness_stub.sh`     | 无 LLM 跑通 Harness               |
 | `scripts/run_meeting_60r_30b.py`   | meeting_order：2×30 轮白话构建（全程 30B） |
 | `scripts/run_meeting_sessions_30b.py` | meeting_order：2×10 轮构建（30B） |
@@ -557,7 +546,6 @@ npm run dev
 ```bash
 chmod +x scripts/*.sh
 bash scripts/demo_doctor.sh
-bash scripts/demo_inject_memory.sh
 ```
 
 ---
@@ -598,7 +586,7 @@ ifclubdemo/
 ## 6. 常见问题
 
 **Q: inject 之后记忆在哪？**  
-A: `workspace/oncall/.ontology_agent/memory/`，用 `python cli.py memory list` 查看。详见 [docs/BUSINESS_MEMORY.md](docs/BUSINESS_MEMORY.md)。
+A: `workspace/meeting_order/.ontology_agent/memory/`，用 `python cli.py memory list` 查看。详见 [docs/BUSINESS_MEMORY.md](docs/BUSINESS_MEMORY.md)。
 
 **Q: 为什么 doctor 说没有 API key？**  
 A: 确认 `ifclubdemo/.env` 存在且含 `LLM_API_KEY=`（不要只改 `.env.example`）。

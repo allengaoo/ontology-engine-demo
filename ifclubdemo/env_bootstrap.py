@@ -53,10 +53,10 @@ def workspace_root() -> Path:
 
 def default_app_name() -> str:
     load_env()
-    return os.environ.get("IFCLUB_APP", "oncall").strip() or "oncall"
+    return os.environ.get("IFCLUB_APP", "meeting_order").strip() or "meeting_order"
 
 
 def default_app_workspace(app: Optional[str] = None) -> Path:
-    """$IFCLUB_WORKSPACE/<app>，默认 oncall。"""
+    """$IFCLUB_WORKSPACE/<app>，默认 meeting_order。"""
     name = app or default_app_name()
     return workspace_root() / name

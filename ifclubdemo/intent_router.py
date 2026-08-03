@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 # ── 意图类型 ──────────────────────────────────────────────────────
 class IntentType(str, Enum):
     ARCHITECTURE   = "architecture"    # 系统设计、技术选型
-    DOMAIN         = "domain"          # 业务域（如 oncall 排班）
+    DOMAIN         = "domain"          # 业务域（如 meeting_order 会议室预订）
     DEBUGGING      = "debugging"       # 排错、异常分析
     DOCUMENTATION  = "documentation"  # 写文档、规范
     GENERAL        = "general"         # 兜底
@@ -29,8 +29,8 @@ _INTENT_KEYWORDS: Dict[IntentType, List[str]] = {
         "architecture", "design", "layer", "module",
     ],
     IntentType.DOMAIN: [
-        "排班", "值班", "oncall", "工程师", "班次", "冲突", "roster",
-        "shift", "业务", "规则", "验收",
+        "会议室", "预订", "booking", "房间", "room", "冲突", "业务",
+        "规则", "验收", "meeting_order",
     ],
     IntentType.DEBUGGING: [
         "报错", "bug", "exception", "异常", "失败", "crash", "排错",
@@ -74,7 +74,7 @@ _DEFAULT_ROUTE_TABLE: Dict[IntentType, RouteConfig] = {
         intent=IntentType.DOMAIN,
         domains=["domain", "code-arch"],
         tiers=["hot", "warm", "cold"],
-        concept_hints=["oncall", "roster", "shift", "rule"],
+        concept_hints=["meeting_order", "booking", "room", "rule"],
         budget_multiplier=0.8,
     ),
     IntentType.DEBUGGING: RouteConfig(

@@ -24,7 +24,7 @@ WS = ROOT / "workspace" / "meeting_order"
 
 PATH_RULE = (
     "硬性约束：只改 meeting_order 路径（backend/src/meeting_order/**、tests/meeting_order/**、"
-    "frontend/src/**、docs/**、data/**）；禁止任何 oncall 路径。"
+    "frontend/src/**、docs/**、data/**）；禁止臆造其他包路径。"
 )
 
 SIG_HINT = (
@@ -100,7 +100,7 @@ def _restore_distilled_memories(archive: Path) -> int:
             text = p.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        if "meeting_order" in text or "No module named 'oncall'" in text:
+        if "meeting_order" in text:
             shutil.copy2(p, dst_dom / p.name)
             n += 1
             print(f"  [memory] restore {p.name} (meeting-related ANTI-EP)")
@@ -526,13 +526,7 @@ def distill_failure_to_memory(
         tip = fail_text.strip().splitlines()[-1][:160] if fail_text.strip() else "unknown"
 
     # 规则化修复路径
-    if "oncall" in fail_text and ("No module" in fail_text or "from oncall" in fail_text):
-        fix = (
-            "禁止 import/from oncall；只用 meeting_order.config 与 "
-            "meeting_order.repositories.factory；改前先 rg oncall"
-        )
-        cn = "会议应用源码禁止出现 oncall 包导入"
-    elif any(
+    if any(
         s in fail_text
         for s in (
             "BaseRoomRepository",
@@ -683,12 +677,6 @@ def seed_known_meeting_rules(ws: Path) -> None:
     mem = ws / ".ontology_agent" / "memory" / "DOMAIN"
     mem.mkdir(parents=True, exist_ok=True)
     rules = [
-        (
-            "CN-MEETING-NO-ONCALL",
-            "禁止任何 oncall 导入；只用 meeting_order.*",
-            "源码与测试不得出现 `import oncall` / `from oncall`；"
-            "配置用 meeting_order.config；存取用 meeting_order.repositories.factory。",
-        ),
         (
             "CN-MEETING-REPO-NAMES",
             "仓储只用 MeetingRepository + SqliteRepository + factory",
@@ -989,7 +977,7 @@ def main() -> int:
                         f"{force_file}\n"
                         f"必须先避开以下已沉淀规则/ANTI，禁止重复同一错误：\n{anti}\n\n"
                         f"原任务：{task_desc}\n"
-                        "强制 1 文件；先对齐上游签名与 import；禁止 oncall；禁止 Base*Repository。"
+                        "强制 1 文件；先对齐上游签名与 import；禁止 Base*Repository。"
                     )
                     base_ctx = dict(base_ctx)
                     base_ctx["_max_units"] = 1  # Repair 强制单文件
@@ -1083,7 +1071,7 @@ enforcement: reject
 指纹 `{fp}` 已连续失败。下一轮必须：
 1) 只改 1 个文件
 2) 修复路径固定为：{distilled['fix']}
-3) 改前用 rg 确认无 oncall / 无虚构模块
+3) 改前用 rg 确认无虚构模块
 4) 关键错误：{distilled['tip']}
 
 ## WHEN

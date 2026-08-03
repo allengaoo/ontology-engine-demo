@@ -48,10 +48,9 @@ _BSA_SYSTEM = """你是 BusinessStructureAgent（BSA），只产出 StructurePla
 1) 每个 Unit 的 target_path 必须是具体文件（含扩展名），禁止目录伪 Unit
 2) 默认只规划 1 个 Unit；任务正文显式点名多个文件时最多 2；禁止 3+
 3) depends_on 必须为空列表（禁止把文件路径填进 depends_on）
-4) 包名与任务一致：meeting_order 任务只用 backend/src/meeting_order/** 与 tests/meeting_order/**；
-   oncall 任务只用 backend/src/oncall/** 与 tests/oncall/**
+4) 包名与任务一致：meeting_order 任务只用 backend/src/meeting_order/** 与 tests/meeting_order/**
 5) 禁止：backend/src/main.py、backend.src 前缀、backend/src/repositories/（缺包名）、
-   跨包互引（meeting↔oncall）
+   跨包互引
 6) 任务正文若点名具体文件，units 必须覆盖这些文件且不超过 max_units
 7) exports 列出本文件对外符号，供后续对齐；不要规划「顺手改」无关文件
 只输出 JSON。"""
@@ -137,23 +136,23 @@ class BusinessStructureAgent:
 
         return StructurePlan(
             plan_id=f"plan-{uuid.uuid4().hex[:6]}",
-            action="implement_oncall_conflict_check",
-            rationale="基于记忆拆分 oncall 冲突检测",
+            action="implement_meeting_conflict_check",
+            rationale="基于记忆拆分 meeting_order 冲突检测",
             derived_from=constraint_ids[:4] + pattern_ids[:2],
             units=[
                 PlanUnit(
                     unit_id="u1",
                     kind=UnitKind.MODIFY,
-                    target_path="backend/src/oncall/domain/rules.py",
-                    description="实现同日不可双班等冲突检测",
-                    exports=["RuleViolation", "validate_roster", "check_no_double_shift"],
+                    target_path="backend/src/meeting_order/domain/rules.py",
+                    description="实现同房间时间冲突检测",
+                    exports=["check_no_overlap", "BookingConflict"],
                     pattern_ids=pattern_ids[:1],
                     constraint_ids=[c["id"] for c in constraints if c.get("rule_id")][:2],
                 ),
                 PlanUnit(
                     unit_id="u2",
                     kind=UnitKind.TEST,
-                    target_path="tests/oncall/test_rules.py",
+                    target_path="tests/meeting_order/test_rules.py",
                     description="冲突检测单测",
                     depends_on=["u1"],
                     constraint_ids=constraint_ids[:1],

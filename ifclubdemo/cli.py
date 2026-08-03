@@ -3,7 +3,7 @@
 ifclubdemo CLI — 动态本体 + 多智能体 + 小模型编码工具
 
   python cli.py doctor
-  python cli.py init-app oncall
+  python cli.py init-app meeting_order
   python cli.py inject docs/business_brief.md
   python cli.py inject-arch docs/architecture_brief.md
   python cli.py memory list
@@ -35,7 +35,6 @@ from env_bootstrap import (  # noqa: E402
 from cli_support.inject_arch import inject_architecture_brief  # noqa: E402
 from cli_support.inject_brief import inject_business_brief  # noqa: E402
 from cli_support.scaffold_meeting_order import scaffold_meeting_order  # noqa: E402
-from cli_support.scaffold_oncall import scaffold_oncall  # noqa: E402
 from agents.coding_agent import allow_stub  # noqa: E402
 from llm_chat import (  # noqa: E402
     is_llm_available,
@@ -128,13 +127,11 @@ def cmd_init_app(args: argparse.Namespace) -> int:
         ws = Path(args.workspace).expanduser().resolve()
     else:
         ws = default_app_workspace(name).resolve()
-    if name == "oncall":
-        root = scaffold_oncall(ws)
-    elif name == "meeting_order":
+    if name == "meeting_order":
         root = scaffold_meeting_order(ws)
     else:
         print(
-            f"目前仅支持 init-app oncall|meeting_order，收到: {name}",
+            f"目前仅支持 init-app meeting_order，收到: {name}",
             file=sys.stderr,
         )
         return 2
@@ -489,7 +486,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(func=cmd_init)
 
     sp = sub.add_parser("init-app", help="生成应用脚手架")
-    sp.add_argument("name", nargs="?", default=None, help="应用名，默认 $IFCLUB_APP / oncall")
+    sp.add_argument("name", nargs="?", default=None, help="应用名，默认 $IFCLUB_APP / meeting_order")
     add_ws(sp)
     sp.set_defaults(func=lambda a: cmd_init_app(_with_app_name(a)))
 
@@ -524,7 +521,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument(
             "--tests",
             default="",
-            help="限定 pytest 路径，逗号分隔（分阶段 EP 用，如 tests/oncall/test_rules.py）",
+            help="限定 pytest 路径，逗号分隔（分阶段 EP 用，如 tests/meeting_order/test_rules.py）",
         )
         sp.set_defaults(fix_mode=False)
 

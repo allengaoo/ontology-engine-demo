@@ -37,7 +37,7 @@ DEFAULT_AGENT_SCOPES: Dict[str, AgentMemoryScope] = {
         read_layers=["context"],
         write_layers=["context"],
         budget_multiplier=0.8,
-        concept_hints=["oncall", "roster"],
+        concept_hints=["meeting_order", "booking"],
     ),
     "OntologyAgent": AgentMemoryScope(
         agent_name="OntologyAgent",
@@ -46,7 +46,7 @@ DEFAULT_AGENT_SCOPES: Dict[str, AgentMemoryScope] = {
         read_layers=["critical", "rule", "context"],
         write_layers=["rule"],
         budget_multiplier=1.0,
-        concept_hints=["architecture", "oncall", "pattern"],
+        concept_hints=["architecture", "meeting_order", "pattern"],
     ),
     "SimAgent": AgentMemoryScope(
         agent_name="SimAgent",
@@ -55,7 +55,7 @@ DEFAULT_AGENT_SCOPES: Dict[str, AgentMemoryScope] = {
         read_layers=["critical", "rule"],
         write_layers=["context"],
         budget_multiplier=0.6,
-        concept_hints=["oncall", "rule"],
+        concept_hints=["meeting_order", "rule"],
     ),
     "CoderAgent": AgentMemoryScope(
         agent_name="CoderAgent",
@@ -64,7 +64,7 @@ DEFAULT_AGENT_SCOPES: Dict[str, AgentMemoryScope] = {
         read_layers=["critical", "rule", "pattern"],
         write_layers=[],
         budget_multiplier=1.0,
-        concept_hints=["architecture", "oncall", "fastapi"],
+        concept_hints=["architecture", "meeting_order", "fastapi"],
     ),
 }
 
