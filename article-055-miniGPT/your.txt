@@ -1,0 +1,20 @@
+The quick brown fox jumps over the lazy dog.
+Once upon a time, there was a small language model.
+It learned to guess the next character, one step at a time.
+Hello world. Training data does not need to be long for a demo.
+Practice makes progress. Read, predict, update, repeat.
+The rain in Spain stays mainly in the plain.
+To be or not to be, that is the question.
+All models are wrong, but some are useful.
+Numbers in, numbers out. Softmax turns scores into probabilities.
+Attention looks back, never into the future.
+Layer by layer, the network stacks the same simple blocks.
+Matrix multiply, add, normalize, and activate.
+A toy GPT is still a GPT: same skeleton, smaller size.
+When the window is full, the oldest token slides away.
+Loss measures how surprised the model is by the true next letter.
+Lower loss usually means better next-token guesses.
+Generate means: take the highest probability character and append it.
+There is no separate module for business rules or constraints.
+That is why decision systems need data, ontology, and agents too.
+End of sample text for miniGPT train demo.
