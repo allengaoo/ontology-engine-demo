@@ -51,7 +51,14 @@ ifclubdemo/
 │   └── meeting_schema.json         # 领域 Object硬 Schema
 ├── instances/                     # 未 inject-arch 时的架构种子
 ├── schema/objects/*.yaml          # 记忆 ObjectType（Constraint/Pattern/Anti/Decision）
-└── scripts/run_meeting_60r_30b.py  # 2×30 轮白话构建实验
+├── scripts/run_meeting_60r_30b.py  # 2×30 轮白话构建实验
+└── ifclubdemo_ontology_fs.py      # 不调用模型的缩小示例：本体记忆当文件系统
+```
+
+不调用模型、只看记忆怎么装入和写回时，运行：
+
+```bash
+python3 ifclubdemo_ontology_fs.py
 ```
 
 
