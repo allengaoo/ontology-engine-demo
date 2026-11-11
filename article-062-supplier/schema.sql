@@ -28,11 +28,6 @@ CREATE TABLE audit_log (
     detail text NOT NULL
 );
 
-CREATE TABLE global_tx (
-    id text PRIMARY KEY,
-    status text NOT NULL
-);
-
 CREATE TABLE consumed_event (
     event_id text PRIMARY KEY
 );
