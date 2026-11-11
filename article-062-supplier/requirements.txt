@@ -1,0 +1,4 @@
+psycopg[binary]==3.2.13
+elasticsearch==8.15.1
+kafka-python==2.0.2
+pymysql==1.1.1

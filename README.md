@@ -11,6 +11,18 @@
 - **phase6** — 记忆本体内核（文章 29-36）
 - **phase7** — 记忆感知多智能体（文章 037）
 - **phase8** — Harness + 双 Agent（文章 041）
+- **article-062-supplier** — 文章 062：工厂 7 号更换供应商，两个业务库一起提交
+
+## 文章 062
+
+采购库和合同库一起提交。通知失败停在待通知。说明和启动方式见 [article-062-supplier/README.md](article-062-supplier/README.md)。
+
+```bash
+cd article-062-supplier
+docker compose up -d
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python simulate.py
+```
 
 ---
 
