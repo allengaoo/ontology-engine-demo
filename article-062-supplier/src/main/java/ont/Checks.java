@@ -1,7 +1,32 @@
 package ont;
 
+import java.util.List;
+
 public final class Checks {
     private Checks() {}
+
+    public static void lookup(List<Integer> orders, List<DorisRate.Agg> aggs) {
+        require(
+                "0 索引返回工厂 7 号的两张采购单",
+                orders.size() == 2 && orders.get(0) == Config.PO_MAIN && orders.get(1) == Config.PO_RECONCILE,
+                "采购单 " + orders);
+        int low = 0;
+        StringBuilder detail = new StringBuilder();
+        for (DorisRate.Agg agg : aggs) {
+            detail.append(Log.supplier(agg.supplierId())).append(" ")
+                    .append(Log.rate(agg.rate())).append("/").append(agg.rows()).append(" ");
+            if (agg.rows() != 12) {
+                fail("0 交货记录行数", detail.toString());
+            }
+            if (agg.rate() < Config.RATE_CUTOFF) {
+                low++;
+                if (agg.supplierId() != Config.SUPPLIER_YI || !"0.82".equals(Log.rate(agg.rate()))) {
+                    fail("0 低于 90% 的供应商", detail.toString());
+                }
+            }
+        }
+        require("0 汇总后低于 90% 的只有乙", low == 1 && aggs.size() == 3, detail.toString());
+    }
 
     public static void bothRollBack() {
         try {

@@ -68,6 +68,9 @@ public final class Engine {
     }
 
     private String gate(ChangeRow row, String actor) {
+        if (!inFactoryIndex(row, actor)) {
+            return "拒绝";
+        }
         Double rate = DorisRate.of(row.newSupplierId());
         if (rate == null || rate >= Config.RATE_CUTOFF) {
             PurchaseDb.audit(row.id(), actor, "拒绝", "不在这次结果里");
@@ -95,8 +98,22 @@ public final class Engine {
             Log.line("确认 更换单 " + row.id() + "：主管看到状态 " + row.status() + "，拒绝，两个库不写");
             return "拒绝";
         }
-        Log.line("确认 更换单 " + row.id() + "：准时率 " + Log.rate(rate) + "，进入全局事务");
+        Log.line("确认 更换单 " + row.id() + "：采购单在工厂 " + Config.FACTORY_ID
+                + " 的索引里，准时率 " + Log.rate(rate) + "，进入全局事务");
         return null;
+    }
+
+    private static boolean inFactoryIndex(ChangeRow row, String actor) {
+        try {
+            if (OrderIndex.search(Config.FACTORY_ID).contains(row.poId())) {
+                return true;
+            }
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+        PurchaseDb.audit(row.id(), actor, "拒绝", "不在这次查找里");
+        Log.line("确认 更换单 " + row.id() + "：采购单不在工厂 " + Config.FACTORY_ID + " 的索引里，拒绝");
+        return false;
     }
 
     private static boolean needsSupervisor(ChangeRow row, String actor) {

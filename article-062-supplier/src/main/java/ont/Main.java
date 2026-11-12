@@ -3,6 +3,7 @@ package ont;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 public final class Main {
     public static void main(String[] args) throws Exception {
@@ -34,6 +35,8 @@ public final class Main {
     }
 
     private static void run(Engine engine, Portal portal, Catchup catchup) throws Exception {
+        scene("工厂 7 号的采购单和准时率");
+        lookup();
         scene("两个库都准备好，提交前失败");
         Checks.bothRollBack();
         scene("新供应商准时率不低于 90%");
@@ -48,6 +51,19 @@ public final class Main {
         notifyThenResend(engine, portal, catchup);
         scene("年采购额 10 万，门户已送达后补记");
         reconcileUnderThreshold(engine, portal);
+    }
+
+    private static void lookup() throws Exception {
+        List<Integer> orders = OrderIndex.search(Config.FACTORY_ID);
+        Log.line("查找 Elasticsearch：factory_id=" + Config.FACTORY_ID + "，采购单 " + orders);
+        List<DorisRate.Agg> aggs = DorisRate.aggregate();
+        StringBuilder text = new StringBuilder("查找 Doris 汇总：");
+        for (DorisRate.Agg agg : aggs) {
+            text.append(Log.supplier(agg.supplierId())).append(" ")
+                    .append(Log.rate(agg.rate())).append("（").append(agg.rows()).append(" 行） ");
+        }
+        Log.line(text.toString().trim());
+        Checks.lookup(orders, aggs);
     }
 
     private static void scene(String title) {

@@ -50,11 +50,30 @@ public final class Seed {
     private static void seedDoris() throws Exception {
         try (Connection conn = DriverManager.getConnection(Config.DORIS_URL, "root", "");
                 var statement = conn.createStatement()) {
-            statement.execute("INSERT INTO ont.delivery VALUES (1, 96, 4), (2, 82, 18), (3, 95, 5)");
+            insertYear(statement, Config.SUPPLIER_JIA, 96, 4);
+            insertYear(statement, Config.SUPPLIER_YI, 82, 18);
+            insertYear(statement, Config.SUPPLIER_BING, 95, 5);
             statement.execute(
                     "INSERT INTO ont.purchase_order VALUES (" + Config.PO_MAIN + ", 1, '待确认'), ("
                             + Config.PO_RECONCILE + ", 1, '待确认')");
         }
+    }
+
+    private static void insertYear(java.sql.Statement statement, int supplier, int onTime, int late)
+            throws Exception {
+        int base = onTime / 12;
+        int remainder = onTime % 12;
+        StringBuilder sql = new StringBuilder("INSERT INTO ont.delivery VALUES ");
+        for (int period = 1; period <= 12; period++) {
+            if (period > 1) {
+                sql.append(", ");
+            }
+            int on = base + (period <= remainder ? 1 : 0);
+            int missed = period <= late % 12 ? late / 12 + 1 : late / 12;
+            sql.append("(").append(supplier).append(", ").append(period).append(", ")
+                    .append(on).append(", ").append(missed).append(")");
+        }
+        statement.execute(sql.toString());
     }
 
     public static void setNewSupplier(int changeId, int supplierId) throws Exception {

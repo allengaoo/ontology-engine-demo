@@ -15,7 +15,7 @@
 
 ## 文章 062
 
-目录说明、端口和检查项见 [article-062-supplier/README.md](article-062-supplier/README.md)。采购库和合同库是两个 PostgreSQL，主机端口分别是 5434 和 5433。
+目录说明、端口和检查项见 [article-062-supplier/README.md](article-062-supplier/README.md)。采购库和合同库是两个 PostgreSQL，主机端口分别是 5434 和 5433。查找先问 Elasticsearch 里工厂 7 号的采购单，准时率由 Doris 在确认时汇总。
 
 ```bash
 cd article-062-supplier

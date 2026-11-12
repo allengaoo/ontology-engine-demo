@@ -6,6 +6,8 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class DorisRate {
     private DorisRate() {}
@@ -37,6 +39,24 @@ public final class DorisRate {
             statement.execute("DROP TABLE IF EXISTS ont.purchase_order");
             statement.execute(deliveryDdl());
             statement.execute(orderDdl());
+        }
+    }
+
+    public record Agg(int supplierId, double rate, int rows) {}
+
+    public static List<Agg> aggregate() {
+        String sql = "SELECT supplier_id, SUM(on_time) * 1.0 / (SUM(on_time) + SUM(late)), COUNT(*) "
+                + "FROM ont.delivery GROUP BY supplier_id ORDER BY supplier_id";
+        List<Agg> aggs = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(Config.DORIS_URL, "root", "");
+                Statement statement = conn.createStatement();
+                ResultSet rows = statement.executeQuery(sql)) {
+            while (rows.next()) {
+                aggs.add(new Agg(rows.getInt(1), rows.getDouble(2), rows.getInt(3)));
+            }
+            return aggs;
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
         }
     }
 
@@ -89,8 +109,8 @@ public final class DorisRate {
     }
 
     private static String deliveryDdl() {
-        return "CREATE TABLE ont.delivery (supplier_id INT, on_time INT, late INT) "
-                + "DUPLICATE KEY(supplier_id) DISTRIBUTED BY HASH(supplier_id) BUCKETS 1 "
+        return "CREATE TABLE ont.delivery (supplier_id INT, period INT, on_time INT, late INT) "
+                + "DUPLICATE KEY(supplier_id, period) DISTRIBUTED BY HASH(supplier_id) BUCKETS 1 "
                 + "PROPERTIES (\"replication_num\" = \"1\")";
     }
 

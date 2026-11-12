@@ -5,6 +5,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class OrderIndex {
     private static final HttpClient HTTP = HttpClient.newBuilder()
@@ -24,6 +26,29 @@ public final class OrderIndex {
                 + ",\"supplier_id\":" + supplierId
                 + ",\"status\":\"" + status + "\"}";
         send("PUT", "/" + Config.INDEX + "/_doc/" + poId + "?refresh=wait_for", body);
+    }
+
+    public static List<Integer> search(int factoryId) throws Exception {
+        String body = "{\"size\":20,\"query\":{\"term\":{\"factory_id\":" + factoryId + "}}}";
+        HttpResponse<String> response = send("POST", "/" + Config.INDEX + "/_search", body);
+        if (response.statusCode() >= 300) {
+            throw new IllegalStateException("索引查询失败 " + response.statusCode());
+        }
+        List<Integer> ids = new ArrayList<>();
+        String key = "\"_id\":\"";
+        int from = 0;
+        while (true) {
+            int at = response.body().indexOf(key, from);
+            if (at < 0) {
+                break;
+            }
+            int start = at + key.length();
+            int end = response.body().indexOf('"', start);
+            ids.add(Integer.parseInt(response.body().substring(start, end)));
+            from = end + 1;
+        }
+        ids.sort(Integer::compareTo);
+        return ids;
     }
 
     public static Doc get(int poId) throws Exception {
